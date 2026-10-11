@@ -153,6 +153,13 @@ try:
     got = [os.path.basename(p) for p in recent.list_recent()]
     check("最近打开：去重、置顶、过滤失效文件", got == ["夜航.txt"], str(got))
     recent.clear()
+
+    from liaoshu.desktop import _load_geom, _save_geom
+
+    class _Win:
+        x, y, width, height = 130, 90, 1111, 777
+    _save_geom(_Win())
+    check("原生窗口几何：存了能读回", _load_geom() == (130, 90, 1111, 777), str(_load_geom()))
 finally:
     if _old_xdg is None:
         os.environ.pop("XDG_CONFIG_HOME", None)

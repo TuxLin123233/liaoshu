@@ -35,14 +35,49 @@ def run_native(path: str, port: int = 8770, speed: float = 1.0,
                        open_browser=False, block=False, rules=rules)
 
     title = f"聊书 · {os.path.splitext(os.path.basename(path))[0]}"
+    gx, gy, gw, gh = _load_geom()
     window = webview.create_window(
-        title, url, width=1000, height=720, min_size=(720, 480))
-    window.events.closed += lambda: _shutdown(httpd)
+        title, url, x=gx, y=gy, width=gw, height=gh, min_size=(720, 480))
+    window.events.closed += lambda: (_save_geom(window), _shutdown(httpd))
 
     try:
         webview.start()
     finally:
         _shutdown(httpd)
+
+
+def _geom_path() -> str:
+    from .rules import config_dir
+    return os.path.join(config_dir(), "window.json")
+
+
+def _load_geom() -> tuple[int | None, int | None, int, int]:
+    """上次窗口的大小/位置；坏了或没有就用默认。"""
+    import json
+    try:
+        with open(_geom_path(), "r", encoding="utf-8") as f:
+            d = json.load(f)
+        w = max(720, int(d["w"]))
+        h = max(480, int(d["h"]))
+        x = d.get("x")
+        y = d.get("y")
+        return (int(x) if x is not None else None,
+                int(y) if y is not None else None, w, h)
+    except (OSError, ValueError, KeyError, TypeError):
+        return (None, None, 1000, 720)
+
+
+def _save_geom(window) -> None:
+    """关窗前把窗口几何记下来，下次原样开。"""
+    import json
+    try:
+        d = {"x": int(window.x), "y": int(window.y),
+             "w": int(window.width), "h": int(window.height)}
+        os.makedirs(os.path.dirname(_geom_path()), exist_ok=True)
+        with open(_geom_path(), "w", encoding="utf-8") as f:
+            json.dump(d, f)
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
 
 
 def _shutdown(httpd) -> None:
