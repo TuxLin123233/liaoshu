@@ -9,6 +9,16 @@
 为什么要锚定：中文里 道 / 想 / 念 / 应 这些单字动词满地都是
 （知道、想到、应该），如果用"整段扫名字+动词"的松匹配，
 会把"他说"、"知道他"这种统统当成角色名——实测第一版就是这么翻车的。
+
+第二遍在演员表之外还要记住两件事：
+
+  - **最近在场的人**（`named`）：旁白点名的、或者显式署名的都算，
+    `她说。` `他说。` 这种代词署名的指代，九成落在"刚描述的那个人"身上。
+    单字代词（她/他）也能当署名 —— 之前正则要 2~4 个字，
+    `“……”她说。` 直接被忽略，只好纯轮替瞎猜。
+  - **性别**（`gender`）：从 `名字……她/他`（同一句话内）粗推，
+    代词消解尽量找同性的。跨句的 `他` 经常是另一个人，不能跨。！
+    只扫对话段落会漏掉纯旁白里的 `阿岩看了他一会儿。`，所以旁白也扫。
 """
 
 from __future__ import annotations
@@ -114,23 +124,41 @@ _ADV = (r"(?:也|都|又|才|就|便|则|却|还|终于|于是|然后|接着|随
         r"大声|冷冷地|淡淡地|平静地|缓缓|慢慢|无奈地|认真地|点头|摇头|顿了顿|"
         r"顿了一下|想了想|沉默片刻|沉默|终于|只好|只得)")
 _NAME = r"(?:[\u4e00-\u9fff]{2,4}|[A-Z][a-zA-Z]{1,14})"
+# 单字代词也能当"名字"：`她说` / `他把杯子放下说` 里的她/他。
+# 之前没加这个，导致「她」这种署名直接被忽略，只好纯轮替硬猜 ——
+# 实测「三十年前的航道记录，有一条备注。」她说。就被猜成了陆离。
+_PRON = r"[她他]"
 # 名字和动词之间允许夹的东西：不能跨句末标点、不能跨引号，
 # 否则 `他压低声音，“你之前说` 会被凑成一个人叫"他压"。
 _MID = r"[^。！？\n“”「」『』\"]"
 
 # 贴着引号后面：「随便。」他说 / 「随便。」阿岩说
-_AFTER_RE = re.compile(rf"^(?P<name>{_NAME})(?:{_ADV})*(?P<v>{_VERB_ALT})")
-_AFTER_LOOSE_RE = re.compile(rf"^(?P<name>{_NAME}){_MID}{{1,12}}?(?P<v>{_VERB_ALT})")
-# 贴着引号前面：阿岩说：/ 阿岩把杯子放下说：
-_BEFORE_RE = re.compile(rf"(?P<name>{_NAME})(?:{_ADV})*(?P<v>{_VERB_ALT})\s*[：:，,]?\s*$")
+_AFTER_RE = re.compile(rf"^(?P<name>{_NAME}|{_PRON})(?:{_ADV})*(?P<v>{_VERB_ALT})")
+_AFTER_LOOSE_RE = re.compile(rf"^(?P<name>{_NAME}|{_PRON}){_MID}{{1,12}}?(?P<v>{_VERB_ALT})")
+# 贴着引号前面：阿岩说：/ 阿岩把杯子放下说：/ 她轻声说：
+_BEFORE_RE = re.compile(rf"(?P<name>{_NAME}|{_PRON})(?:{_ADV})*(?P<v>{_VERB_ALT})\s*[：:，,]?\s*$")
 _BEFORE_LOOSE_RE = re.compile(
-    rf"(?P<name>{_NAME}){_MID}{{1,12}}?(?P<v>{_VERB_ALT})\s*[：:，,]?\s*$")
+    rf"(?P<name>{_NAME}|{_PRON}){_MID}{{1,12}}?(?P<v>{_VERB_ALT})\s*[：:，,]?\s*$")
 
 _PRONOUNS = {"他", "她", "它", "我", "你", "他们", "她们", "咱们", "我们", "你们", "对方"}
-_BAD_NAME_CHARS = set("的了着是不没把被在和与这那就都也很才又啊吧呢吗哦呀嗯得好让给向从对为")
+# 身体动作后缀会被 `名字：` 直书误当成名字的一部分（`小满点头：` → 小满点头）。
+# 这些字基本不会出现在人名的最后，加了它们之后 `点头：/抬头：/摇头：` 就不会再吃字。
+_BAD_NAME_CHARS = set("的了着是不没把被在和与这那就都也很才又啊吧呢吗哦呀嗯得好让给向从对为"
+                      "点摇头低下抬")
+# 人名**最后一个字**几乎不可能是这些"功能字"（趋向/时态/副词/动词/称谓）。
+# 名字正则按贪婪 2~4 字截取时，会把 `高玉德犹豫了一下说` 的"犹豫"、
+# `气冲冲地说` 的"气冲冲地"、`巧珍一边说` 的"一边"整个吞掉——
+# `label_before` 的直书兜底（`名字：`）更猛，`她问儿子：` / `处叫冤说：` /
+# `眯眯地说：` 全是它抓的。这些假名无一例外以功能字收尾，
+# 所以卡"末字"比卡"含某字"安全得多（`李天一`、`王子`、`周依然` 这种真名不受影响）。
+_BAD_NAME_TAILS = set("边里外前后来去进出于地到赶凑犹气冲冤汉亲人语笑哭叹唱看听见望站蹲坐躺"
+                      "走跑追喊叫道问答应应叹骂吼念便就也将把他说该完过同苦咆咐子妈爸高女他她"
+                      "手嘴轻想住告知惊玩叨断脸兄睛颤回硬摆母终怔般有舌先号父也另溅解部一"
+                      "咽转怪吐")
 _NOT_NAMES = {"知道", "说道", "想道", "应该", "回答", "开口", "他们", "她们", "众人",
               "所有", "有人", "大家", "什么", "怎么", "这么", "那么", "自己", "东西",
-              "时候", "已经", "可以", "因为", "所以", "但是", "如果", "这个", "那个"}
+              "时候", "已经", "可以", "因为", "所以", "但是", "如果", "这个", "那个",
+              "一边", "半天", "自言自语"}
 # 纯署名的旁白片段（不该单独显示成一条旁白）
 _PURE_ATTR_RE = re.compile(rf"^[^。！？\n]{{0,8}}?(?:{_VERB_ALT})\s*[，,。]?$")
 
@@ -143,6 +171,8 @@ def _plausible_name(s: str) -> bool:
     if not re.fullmatch(r"[\u4e00-\u9fff]{2,4}|[A-Z][a-zA-Z]{1,14}", s):
         return False
     if s in _NOT_NAMES:
+        return False
+    if s[-1] in _BAD_NAME_TAILS:
         return False
     if any(c in _BAD_NAME_CHARS for c in s):
         return False
@@ -316,8 +346,41 @@ def _chatlog_line(p: str) -> tuple[str, str] | None:
     return None
 
 
-def _resolve(seg, before, after, narr_all, cast, recent, gender):
+def _push_named(name: str | None, named: deque):
+    """记下"最近在场上出现的人"，供代词消解、轮替兜底用。"""
+    if not name:
+        return
+    if named and named[-1] == name:
+        return
+    named.append(name)
+
+
+def _note_named(text: str, cast: set[str], named: deque, gender: dict):
+    """旁白里点名的角色也算"在场"，按出现顺序追加，顺带推断性别。"""
+    hits = sorted((text.find(n), n) for n in cast if n in text)
+    for _idx, n in hits:
+        _push_named(n, named)
+        _gender_from(text, n, gender)
+
+
+def _gender_from(text: str, speaker: str, gender: dict):
+    """从 `名字……她/他` 的模式粗推性别，代词消解要用。
+
+    必须在**一句话以内**（不跨。！？）：跨句的 `他` 常常是另一个人
+    （`…被小满轻轻拍开了。他伸手…` 里的他指的是阿岩）。但旧版只扫对话段落，
+    `阿岩看了他一会儿。`（纯旁白）这种反而漏了 —— 所以旁白也要扫。
+    """
+    if not speaker or speaker in gender:
+        return
+    if re.search(rf"{re.escape(speaker)}[^。！？\n]{{0,6}}?她", text):
+        gender[speaker] = "女"
+    elif re.search(rf"{re.escape(speaker)}[^。！？\n]{{0,6}}?他", text):
+        gender[speaker] = "男"
+
+
+def _resolve(seg, before, after, narr_all, cast, recent, gender, named=None):
     """按可信度从高到低找说话人。返回 (名字, 可信度)。"""
+    named = named if named is not None else deque()
     pronoun = None
 
     # 1) 引号前紧贴的署名（阿岩说：/ 阿岩把杯子放下说：）
@@ -354,18 +417,24 @@ def _resolve(seg, before, after, narr_all, cast, recent, gender):
     if cand:
         return cand, CONTEXT
 
-    # 7) 代词 → 最近说过话的人（尽量同性）
+    # 7) 代词 → 先看"旁白里最近被点名的"（`她说。` 的指代最常落在刚描述的人身上），
+    #    再看最近说过话的人（尽量同性）
     if pronoun:
         want = "女" if pronoun in ("她", "她们") else ("男" if pronoun in ("他", "他们") else None)
+        for n in reversed(named):
+            g = gender.get(n)
+            if g is None or g == want:                  # 不知道性别也敢接，总比轮替瞎猜强
+                return n, (CONTEXT if g == want else GUESS)
         pool = [x for x in recent if want is None or gender.get(x) == want]
         if pool:
             return pool[-1], GUESS
         if recent:
             return recent[-1], GUESS
 
-    # 8) 纯轮替：群里两个人你一句我一句
+    # 8) 纯轮替：群里两个人你一句我一句 —— 回话通常回给"上一位"，
+    #    所以取 recent[-2]（紧跟着的隔一个人），而不是最早的那个。
     if len(recent) >= 2:
-        return recent[0], GUESS
+        return recent[-2], GUESS
     if recent:
         return recent[-1], GUESS
     return None, GUESS
@@ -376,12 +445,7 @@ def _note_speaker(speaker, para, recent, gender):
         return
     if not recent or recent[-1] != speaker:
         recent.append(speaker)
-    if speaker not in gender:
-        # 从旁白里粗略推断性别，代词消解要用
-        if re.search(rf"{re.escape(speaker)}[^。！？]{{0,6}}她", para):
-            gender[speaker] = "女"
-        elif re.search(rf"{re.escape(speaker)}[^。！？]{{0,6}}他", para):
-            gender[speaker] = "男"
+    _gender_from(para, speaker, gender)
 
 
 def parse(raw: str, keep_narration: bool = True, narration_max_len: int = 80) -> list[Message]:
@@ -409,6 +473,7 @@ def parse(raw: str, keep_narration: bool = True, narration_max_len: int = 80) ->
     # ---- 第二遍：逐句定说话人 ----
     messages: list[Message] = []
     recent: deque[str] = deque(maxlen=3)
+    named: deque[str] = deque(maxlen=8)     # 最近在场上出现的人（旁白点名 + 署名说的话）
     gender: dict[str, str] = {}
     open_idx: int | None = None       # 上一段没闭合、等着续写的对白
 
@@ -417,6 +482,7 @@ def parse(raw: str, keep_narration: bool = True, narration_max_len: int = 80) ->
             name, text = chatlog[pi]
             messages.append(Message("dialogue", text, name, EXPLICIT, pi))
             _note_speaker(name, p, recent, gender)
+            _push_named(name, named)
             open_idx = None
             continue
 
@@ -425,15 +491,19 @@ def parse(raw: str, keep_narration: bool = True, narration_max_len: int = 80) ->
         if open_idx is not None and items and items[0][0]:
             _q, seg, before, after = items[0]
             narr_here = " ".join(s for q, s, _b, _a in items if not q)
+            _note_named(narr_here, cast, named, gender)
             messages[open_idx].text += seg
             if messages[open_idx].speaker is None or messages[open_idx].confidence != EXPLICIT:
-                cand, conf = _resolve(seg, before, after, narr_here, cast, recent, gender)
+                cand, conf = _resolve(seg, before, after, narr_here, cast, recent, gender, named)
                 if cand:
                     messages[open_idx].speaker = cand
                     messages[open_idx].confidence = conf
+                    if conf != GUESS:
+                        _push_named(cand, named)
             items = items[1:]
 
         narr_all = " ".join(seg for q, seg, _b, _a in items if not q)
+        _note_named(narr_all, cast, named, gender)
         for is_quote, seg, before, after in items:
             if not is_quote:
                 if not keep_narration:
@@ -446,8 +516,10 @@ def parse(raw: str, keep_narration: bool = True, narration_max_len: int = 80) ->
                     messages.append(Message("narration", s, None, EXPLICIT, pi))
                 continue
 
-            speaker, conf = _resolve(seg, before, after, narr_all, cast, recent, gender)
+            speaker, conf = _resolve(seg, before, after, narr_all, cast, recent, gender, named)
             _note_speaker(speaker, p, recent, gender)
+            if conf != GUESS:
+                _push_named(speaker, named)
             messages.append(Message("dialogue", seg, speaker, conf, pi))
 
         # 段末仍未闭合 → 记住这一条，下一段接着写

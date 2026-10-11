@@ -68,6 +68,43 @@ check("跨段对白能合并", any("前半句没有结束" in m.text and "后半
                             for m in multi if m.kind == "dialogue"),
       str([(m.kind, m.text) for m in multi]))
 
+# 单字代词署名（她说 / 他说），并被"旁白里刚点名的人"接走
+pron = parse("沈薇说：“走吧。”\n沈薇关掉了星图。\n“那么，”她说，“就按静默航行来。”")
+sp = [m.speaker for m in pron if m.kind == "dialogue"]
+check("单字代词 `她说` 能认出来并落回沈薇", all(s == "沈薇" for s in sp), str(sp))
+
+named = parse("老周问：“怎么了？”\n老周盯着星图看了很久。\n“不确定。”他说。")
+sp = [m.speaker for m in named if m.kind == "dialogue"]
+check("代词 `他` 落到旁白刚点名的人", sp[-1] == "老周", str(sp))
+
+# `名字点头：` 这种身体动作署名不能被吃成"小满点头"这种假名
+body = parse("阿岩问：“信号还在吗？”\n小满点头：“还在。”\n阿岩说：“一直？”")
+sp = [m.speaker for m in body if m.kind == "dialogue"]
+check("`小满点头：` 不会被当成名字", "小满点头" not in sp and "点头" not in sp, str(sp))
+
+alt = parse("阿甲：先吃吧。\n阿乙：不了。\n阿甲：那我自己吃吧。")
+sp = [m.speaker for m in alt if m.kind == "dialogue"]
+check("轮替回话回给上一位", sp == ["阿甲", "阿乙", "阿甲"], str(sp))
+
+# 名尾功能字：`名字+动作/状语` 不能被贪婪名字吃掉（《人生》实测的一大类）
+junk = parse("“老四头该歇了。”德顺老汉唱完长长吐了口气说。\n“嗳。”他知。\n"
+             "“那会儿是真来劲。”加林开玩笑道。\n“可不。”巧珍插嘴。\n"
+             "两个人先后紧张地问她：“出了什么事？”")
+sp = [m.speaker for m in junk if m.kind == "dialogue"]
+bad = {"老汉唱完", "他知", "加林开玩", "巧珍插嘴", "张地问她", "问她",
+       "处叫冤说", "眯眯地说", "亚萍转过", "他招招手"}
+check("名尾功能字不会被吃成名字", not (bad & set(sp)), f"残留 {bad & set(sp)}")
+
+# 长书实测：《人生》主力角色各归各位，动词尾假名不再进说话人栏
+rs = parse(open(os.path.join(ROOT, "samples", "人生.txt"), encoding="utf-8").read())
+rs_sp = [m.speaker for m in rs if m.kind == "dialogue" and m.speaker]
+top = [s for s, _n in __import__("collections").Counter(rs_sp).most_common(6)]
+check("《人生》主力角色占前六", {"加林", "巧珍", "亚萍"} <= set(top), f"前六 {top}")
+check("《人生》说话人以功能字收尾的假名清零",
+      not any(s[-1] in "手嘴轻想住告知惊玩叨断脸兄睛颤回硬摆母终怔般有舌先号父另溅解部一咽转怪吐"
+              for s in rs_sp),
+      f"残留 {sorted({s for s in rs_sp if s[-1] in '手嘴轻想住告知惊玩叨断脸兄睛颤回硬摆母终怔般有舌先号父另溅解部一咽转怪吐'})[:6]}")
+
 # --------------------------------------------------------------------------
 print("\n[2] 时序：确定性")
 personas = build_personas(msgs)

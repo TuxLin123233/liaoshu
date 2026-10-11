@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- 品牌蓝圆角底 -->
+  <rect width="128" height="128" rx="28" fill="#5B8FF9"/>
+  <!-- 群聊气泡（带小尾巴） -->
+  <path d="M30 40a12 12 0 0 1 12-12h44a12 12 0 0 1 12 12v24a12 12 0 0 1-12 12H58L42 90V76h-4a12 12 0 0 1-8-24z" fill="#0F1115" opacity="0.12"/>
+  <path d="M30 40a12 12 0 0 1 12-12h44a12 12 0 0 1 12 12v24a12 12 0 0 1-12 12H58L42 90V76h-4A12 12 0 0 1 30 64z" fill="#FFFFFF"/>
+  <!-- 正在输入的省略号 -->
+  <circle cx="48" cy="52" r="4.6" fill="#5B8FF9"/>
+  <circle cx="64" cy="52" r="4.6" fill="#5B8FF9" opacity="0.75"/>
+  <circle cx="80" cy="52" r="4.6" fill="#5B8FF9" opacity="0.5"/>
+</svg>

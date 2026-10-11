@@ -42,13 +42,11 @@ def main() -> int:
     brain.reset(seed=None)
 
     counts = np.empty(n_win, dtype=np.float64)
-    buf = 0.0
     for w in range(n_win):
         acc = 0
         for _ in range(win):
             acc += len(brain.step())
         counts[w] = acc / win
-        buf = acc
 
     mean = float(counts.mean())
     std = float(counts.std())

@@ -26,6 +26,7 @@ import time
 SAMPLE_MS = 500.0          # 一个采样点代表 500ms
 TAU_S = 45.0               # OU 过程的相关时间：约 45 秒换一次"心情"
 DEPTH = 0.22               # 本地轨道的起伏深度（±22%）
+EXTEND_CHUNK = 8192        # 轨道见底时一次多长这么多条（≈68 分钟阅读量）
 
 
 def _ou_series(n: int, seed: int, dt_ms: float = SAMPLE_MS, tau_s: float = TAU_S) -> list[float]:
@@ -81,13 +82,18 @@ class MoodTrack:
         return v if self.absolute else 1.0 + self.depth * v
 
     def extend(self, n: int) -> None:
-        """轨道不够长时就地延长（只有本地轨道能延长）。"""
+        """轨道不够长时就地延长（只有本地轨道能延长）。
+
+        要延长就一次多长一截（EXTEND_CHUNK 条），不然 `at()` 每前进 500ms
+        都重算一遍整条 OU 序列，读长书会退化成 O(n²)。
+        """
         if self.source != "local":
             return
         with self._gen_lock:
             if n <= len(self.values):
                 return
-            self.values = _ou_series(n, self.seed, self.dt_ms)
+            want = n + EXTEND_CHUNK
+            self.values = _ou_series(want, self.seed, self.dt_ms)
 
     @property
     def stats(self) -> dict:

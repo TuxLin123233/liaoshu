@@ -163,7 +163,8 @@ class Session:
                 self.mood_detail = ""
             self.mood = self._compose_mood()
             self.player.set_mood(self.mood)
-            self._push({"t": "mood", "label": getattr(self.mood, "label", "?"),
+            self._push({"t": "mood", "mode": mode,
+                        "label": getattr(self.mood, "label", "?"),
                         "detail": self.mood_detail, "flyState": self.fly_state})
             self._flush()
         if mode in ("fly", "hybrid"):
@@ -212,7 +213,8 @@ class Session:
             self.fly_state = "ready"
             self.mood = self._compose_mood()
             self.player.set_mood(self.mood)
-            self._push({"t": "mood", "label": getattr(self.mood, "label", "?"),
+            self._push({"t": "mood", "mode": self.mood_mode,
+                        "label": getattr(self.mood, "label", "?"),
                         "detail": detail, "flyState": "ready",
                         "samples": len(track.values), "how": how})
             self._flush()
@@ -309,7 +311,11 @@ def make_handler(session: Session):
         def _serve_file(self, rel: str) -> bool:
             safe = os.path.normpath(rel).lstrip("/")
             full = os.path.join(WEB_DIR, safe)
-            if not os.path.abspath(full).startswith(WEB_DIR) or not os.path.isfile(full):
+            try:
+                inside = os.path.commonpath([os.path.abspath(full), WEB_DIR]) == WEB_DIR
+            except ValueError:
+                inside = False
+            if not inside or not os.path.isfile(full):
                 return False
             with open(full, "rb") as f:
                 body = f.read()

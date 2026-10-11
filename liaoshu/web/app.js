@@ -437,7 +437,7 @@ function onStatus(s) {
 }
 
 function onMood(ev) {
-  if (ev.label) $('mood').value = ev.label.includes('果蝇') ? 'fly' : 'local';
+  if (ev.mode) $('mood').value = ev.mode;
 }
 
 /* ---------------------------------------------------------------- 通信 */
