@@ -154,7 +154,7 @@ _BAD_NAME_CHARS = set("的了着是不没把被在和与这那就都也很才又
 _BAD_NAME_TAILS = set("边里外前后来去进出于地到赶凑犹气冲冤汉亲人语笑哭叹唱看听见望站蹲坐躺"
                       "走跑追喊叫道问答应应叹骂吼念便就也将把他说该完过同苦咆咐子妈爸高女他她"
                       "手嘴轻想住告知惊玩叨断脸兄睛颤回硬摆母终怔般有舌先号父也另溅解部一"
-                      "咽转怪吐")
+                      "咽转怪吐张老鲁然")
 _NOT_NAMES = {"知道", "说道", "想道", "应该", "回答", "开口", "他们", "她们", "众人",
               "所有", "有人", "大家", "什么", "怎么", "这么", "那么", "自己", "东西",
               "时候", "已经", "可以", "因为", "所以", "但是", "如果", "这个", "那个",
@@ -163,23 +163,25 @@ _NOT_NAMES = {"知道", "说道", "想道", "应该", "回答", "开口", "他�
 _PURE_ATTR_RE = re.compile(rf"^[^。！？\n]{{0,8}}?(?:{_VERB_ALT})\s*[，,。]?$")
 
 
-def _plausible_name(s: str) -> bool:
+def _plausible_name(s: str, banned: frozenset[str] = frozenset(),
+                    tail_extra: frozenset[str] = frozenset()) -> bool:
     if not s:
         return False
     if s in _PRONOUNS:
         return True
     if not re.fullmatch(r"[\u4e00-\u9fff]{2,4}|[A-Z][a-zA-Z]{1,14}", s):
         return False
-    if s in _NOT_NAMES:
+    if s in _NOT_NAMES or s in banned:
         return False
-    if s[-1] in _BAD_NAME_TAILS:
+    if s[-1] in _BAD_NAME_TAILS or s[-1] in tail_extra:
         return False
     if any(c in _BAD_NAME_CHARS for c in s):
         return False
     return True
 
 
-def _clean(pre: str) -> str | None:
+def _clean(pre: str, banned: frozenset[str] = frozenset(),
+            tail_extra: frozenset[str] = frozenset()) -> str | None:
     """把'名字+状语'洗成名字。"""
     pre = pre.strip()
     prev = None
@@ -190,29 +192,34 @@ def _clean(pre: str) -> str | None:
         return None
     if pre in _PRONOUNS:
         return pre
-    return pre if _plausible_name(pre) else None
+    return pre if _plausible_name(pre, banned, tail_extra) else None
 
 
-def name_after(window: str) -> str | None:
+def name_after(window: str, banned: frozenset[str] = frozenset(),
+               tail_extra: frozenset[str] = frozenset()) -> str | None:
     """引号**紧后面**的署名。窗口必须从引号后面开始。"""
     if not window:
         return None
     m = _AFTER_RE.match(window) or _AFTER_LOOSE_RE.match(window)
-    return _clean(m.group("name")) if m else None
+    return _clean(m.group("name"), banned, tail_extra) if m else None
 
 
-def name_before(window: str) -> str | None:
+def name_before(window: str, banned: frozenset[str] = frozenset(),
+                tail_extra: frozenset[str] = frozenset()) -> str | None:
     """引号**紧前面**的署名。窗口必须以引号前一个字符结束。"""
     if not window:
         return None
     m = _BEFORE_RE.search(window) or _BEFORE_LOOSE_RE.search(window)
-    return _clean(m.group("name")) if m else None
+    return _clean(m.group("name"), banned, tail_extra) if m else None
 
 
 def cast_in(text: str, cast: set[str], window: int | None = None,
-            prefer_last: bool = True) -> str | None:
+            prefer_last: bool = True, exclude: set[str] | None = None) -> str | None:
     """在一段文字里找演员表成员。"""
     if not text or not cast:
+        return None
+    cast = cast - (exclude or set())
+    if not cast:
         return None
     if window:
         text = text[-window:] if prefer_last else text[:window]
@@ -221,18 +228,35 @@ def cast_in(text: str, cast: set[str], window: int | None = None,
     return hits[-1][1] if hits else None
 
 
-def label_before(window: str, cast: set[str]) -> str | None:
+def label_before(window: str, cast: set[str], exclude: set[str] | None = None,
+                 banned: frozenset[str] = frozenset(),
+                 tail_extra: frozenset[str] = frozenset()) -> str | None:
     """`名字：` 这种直接署名的形式（演员表已知时才好判）。"""
     if not window:
         return None
+    blocked = set(exclude or ()) | set(banned)
     for name in cast:
+        if name in blocked:
+            continue
         idx = window.rfind(name)
         if idx >= 0 and len(window) - idx <= len(name) + 8 and window.rstrip()[-1:] in "：:":
             return name
     m = re.search(rf"(?P<name>{_NAME})\s*[：:]\s*$", window)
-    if m and _plausible_name(m.group("name")):
+    if m and _plausible_name(m.group("name"), banned, tail_extra) \
+            and m.group("name") not in blocked:
         return m.group("name")
     return None
+
+
+# 对话以「名字，/名字？/名字！」开头时，那个名字是**被称呼的人**，
+# 不是说话人（`“加林，你是不是身上不舒服？”母亲用颤音问他`）。
+# 把这个呼格从候选里剔掉，避免把人名错按在旁人头上。
+_VOC_RE = re.compile(rf"^(?P<v>{_NAME})\s*[，,、．。：:！!？?]")
+
+
+def _vocative_in(text: str, cast: set[str]) -> str | None:
+    m = _VOC_RE.match(text or "")
+    return m.group("v") if m and m.group("v") in cast else None
 
 
 # --------------------------------------------------------------------------
@@ -378,42 +402,52 @@ def _gender_from(text: str, speaker: str, gender: dict):
         gender[speaker] = "男"
 
 
-def _resolve(seg, before, after, narr_all, cast, recent, gender, named=None):
+def _resolve(seg, before, after, narr_all, cast, recent, gender, named=None,
+             banned: frozenset[str] = frozenset(),
+             tail_extra: frozenset[str] = frozenset()):
     """按可信度从高到低找说话人。返回 (名字, 可信度)。"""
     named = named if named is not None else deque()
     pronoun = None
+    # 呼格：对话开头被叫到的人不是说话人（`加林，你是不是…`＝对加林说）。
+    # 全名版（`高加林`）也算同一个人：名字"以呼格收尾"的一并剔掉。
+    voc = _vocative_in(seg, cast)
+    blocked = set(banned)
+    if voc:
+        blocked.add(voc)
+        blocked |= {n for n in cast if n.endswith(voc)}
 
     # 1) 引号前紧贴的署名（阿岩说：/ 阿岩把杯子放下说：）
-    cand = name_before(before)
+    cand = name_before(before, banned, tail_extra)
     if cand in _PRONOUNS:
         pronoun = cand
     elif cand:
         return cand, EXPLICIT
 
     # 2) 引号后紧贴的署名（「随便。」阿岩说）
-    cand = name_after(after)
+    cand = name_after(after, banned, tail_extra)
     if cand in _PRONOUNS:
         pronoun = pronoun or cand
     elif cand:
         return cand, EXPLICIT
 
     # 3) 引号后 14 字内提到的人（「……」阿岩的声音从驾驶席传来）
-    cand = cast_in(after, cast, window=14, prefer_last=False)
+    cand = cast_in(after, cast, window=14, prefer_last=False, exclude=blocked)
     if cand:
         return cand, CONTEXT
 
     # 4) 引号前 22 字内提到的人
-    cand = cast_in(before, cast, window=22)
+    cand = cast_in(before, cast, window=22, exclude=blocked)
     if cand:
         return cand, CONTEXT
 
     # 5) 本段旁白里提到的人
-    cand = cast_in(narr_all, cast)
+    cand = cast_in(narr_all, cast, exclude=blocked)
     if cand:
         return cand, CONTEXT
 
     # 6) `名字：` 直接署名
-    cand = label_before(before, cast)
+    cand = label_before(before, cast, exclude=blocked, banned=banned,
+                        tail_extra=tail_extra)
     if cand:
         return cand, CONTEXT
 
@@ -423,9 +457,12 @@ def _resolve(seg, before, after, narr_all, cast, recent, gender, named=None):
         want = "女" if pronoun in ("她", "她们") else ("男" if pronoun in ("他", "他们") else None)
         for n in reversed(named):
             g = gender.get(n)
+            if n in blocked:
+                continue
             if g is None or g == want:                  # 不知道性别也敢接，总比轮替瞎猜强
                 return n, (CONTEXT if g == want else GUESS)
-        pool = [x for x in recent if want is None or gender.get(x) == want]
+        pool = [x for x in recent if x not in blocked
+                and (want is None or gender.get(x) == want)]
         if pool:
             return pool[-1], GUESS
         if recent:
@@ -433,10 +470,11 @@ def _resolve(seg, before, after, narr_all, cast, recent, gender, named=None):
 
     # 8) 纯轮替：群里两个人你一句我一句 —— 回话通常回给"上一位"，
     #    所以取 recent[-2]（紧跟着的隔一个人），而不是最早的那个。
-    if len(recent) >= 2:
-        return recent[-2], GUESS
-    if recent:
-        return recent[-1], GUESS
+    rc = [x for x in recent if x not in blocked]
+    if len(rc) >= 2:
+        return rc[-2], GUESS
+    if rc:
+        return rc[-1], GUESS
     return None, GUESS
 
 
@@ -448,7 +486,14 @@ def _note_speaker(speaker, para, recent, gender):
     _gender_from(para, speaker, gender)
 
 
-def parse(raw: str, keep_narration: bool = True, narration_max_len: int = 80) -> list[Message]:
+def parse(raw: str, keep_narration: bool = True, narration_max_len: int = 80,
+          rules: dict | None = None) -> list[Message]:
+    # 用户过滤规则：ban=整词禁当说话人；letters=追加"名尾黑名单"字；
+    # map=说话人改名/合并（解析完统一替换）。
+    rules = rules or {}
+    banned = frozenset(rules.get("ban", ()))
+    tail_extra = frozenset(str(c) for c in rules.get("letters", ()))
+    mapping = rules.get("map") or {}
     paras = to_paragraphs(raw)
 
     # 聊天记录体只在"整篇都是"的时候才启用，避免把 注意：/提示： 当成角色
@@ -460,12 +505,14 @@ def parse(raw: str, keep_narration: bool = True, narration_max_len: int = 80) ->
     counter: Counter[str] = Counter()
     for pi, _p, items, _pending in _windows(paras):
         if use_chatlog and chatlog[pi]:
-            counter[chatlog[pi][0]] += 1
+            if chatlog[pi][0] not in banned:
+                counter[chatlog[pi][0]] += 1
             continue
         for is_quote, _seg, before, after in items:
             if not is_quote:
                 continue
-            for cand in (name_after(after), name_before(before)):
+            for cand in (name_after(after, banned, tail_extra),
+                         name_before(before, banned, tail_extra)):
                 if cand and cand not in _PRONOUNS:
                     counter[cand] += 1
     cast = {n for n, c in counter.items() if c >= 2} or set(counter)
@@ -480,6 +527,8 @@ def parse(raw: str, keep_narration: bool = True, narration_max_len: int = 80) ->
     for pi, p, items, pending in _windows(paras):
         if use_chatlog and chatlog[pi]:
             name, text = chatlog[pi]
+            if name in banned:
+                continue                     # 用户禁用的名字不入会
             messages.append(Message("dialogue", text, name, EXPLICIT, pi))
             _note_speaker(name, p, recent, gender)
             _push_named(name, named)
@@ -494,7 +543,8 @@ def parse(raw: str, keep_narration: bool = True, narration_max_len: int = 80) ->
             _note_named(narr_here, cast, named, gender)
             messages[open_idx].text += seg
             if messages[open_idx].speaker is None or messages[open_idx].confidence != EXPLICIT:
-                cand, conf = _resolve(seg, before, after, narr_here, cast, recent, gender, named)
+                cand, conf = _resolve(seg, before, after, narr_here, cast,
+                                      recent, gender, named, banned, tail_extra)
                 if cand:
                     messages[open_idx].speaker = cand
                     messages[open_idx].confidence = conf
@@ -516,7 +566,8 @@ def parse(raw: str, keep_narration: bool = True, narration_max_len: int = 80) ->
                     messages.append(Message("narration", s, None, EXPLICIT, pi))
                 continue
 
-            speaker, conf = _resolve(seg, before, after, narr_all, cast, recent, gender, named)
+            speaker, conf = _resolve(seg, before, after, narr_all, cast,
+                                     recent, gender, named, banned, tail_extra)
             _note_speaker(speaker, p, recent, gender)
             if conf != GUESS:
                 _push_named(speaker, named)
@@ -539,6 +590,10 @@ def parse(raw: str, keep_narration: bool = True, narration_max_len: int = 80) ->
             chapter_seen.add(pi)
     merged = sorted(out + [m for m in messages if not (m.kind == "narration" and m.para in chapter_seen and m.text.strip() in {q.text for q in out})],
                     key=lambda m: (m.para, 0 if m.kind == "chapter" else 1))
+    if mapping:
+        for m in merged:
+            if m.speaker:
+                m.speaker = mapping.get(m.speaker, m.speaker)
     return merged
 
 

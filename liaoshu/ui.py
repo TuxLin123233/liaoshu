@@ -59,11 +59,12 @@ def _short_note(note: str) -> str:
 class ChatBookApp:
     def __init__(self, root: tk.Tk, path: str | None = None,
                  mood_mode: str = "local", mood_cache: str | None = None,
-                 fly_seconds: int = 300, speed: float = 1.0):
+                 fly_seconds: int = 300, speed: float = 1.0, rules=None):
         self.root = root
         self.font = pick_font()
         self.init_speed = speed
         self.mood_mode = mood_mode
+        self._rules = rules
         self.mood_cache = mood_cache or os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "cache", "fly_mood.txt")
@@ -227,7 +228,7 @@ class ChatBookApp:
 
     def load(self, path: str):
         try:
-            msgs = parse_file(path)
+            msgs = parse_file(path, rules=self._rules)
         except Exception as e:                       # noqa: BLE001
             self._set_status(f"读取失败：{e}")
             return
@@ -647,7 +648,7 @@ class ChatBookApp:
 
 
 def run(path: str | None = None, mood_mode: str = "local", mood_cache: str | None = None,
-        fly_seconds: int = 300, speed: float = 1.0):
+        fly_seconds: int = 300, speed: float = 1.0, rules=None):
     root = tk.Tk()
-    ChatBookApp(root, path, mood_mode, mood_cache, fly_seconds, speed)
+    ChatBookApp(root, path, mood_mode, mood_cache, fly_seconds, speed, rules)
     root.mainloop()

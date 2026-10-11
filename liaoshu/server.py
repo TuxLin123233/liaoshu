@@ -22,6 +22,7 @@ from .mood import (BlendMood, MoodSource, MoodTrack, fly_available,
 from .parser import parse_file
 from .personas import build_personas, persona_for
 from .rhythm import Player, PlayerHooks, RhythmModel
+from .rules import default_rules, load_rules
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 TICK_S = 0.012              # 播放器心跳
@@ -37,8 +38,10 @@ class Session:
     """一本书 + 一个播放器 + 若干 SSE 订阅者。"""
 
     def __init__(self, path: str, mood_mode: str = "local", speed: float = 1.0,
-                 fly_seconds: int = 300, mood_cache: str | None = None):
+                 fly_seconds: int = 300, mood_cache: str | None = None,
+                 rules: dict | None = None):
         self.path = path
+        self.rules = rules
         self.lock = threading.RLock()
         self.clients: set[queue.Queue] = set()
         self.pending: list[dict] = []
@@ -48,7 +51,7 @@ class Session:
         self.mood_cache = mood_cache or os.path.join(PROJECT, "cache", "fly_mood.txt")
         self._fly_started = False
 
-        self.messages = parse_file(path)
+        self.messages = parse_file(path, rules=rules)
         self.personas = build_personas(self.messages)
         self.chapters = [{"idx": i, "text": m.text}
                          for i, m in enumerate(self.messages) if m.kind == "chapter"]
@@ -412,8 +415,8 @@ def make_handler(session: Session):
 
 def serve(path: str, port: int = 8770, mood_mode: str = "local", speed: float = 1.0,
           fly_seconds: int = 300, mood_cache: str | None = None,
-          open_browser: bool = True, block: bool = True):
-    session = Session(path, mood_mode, speed, fly_seconds, mood_cache)
+          open_browser: bool = True, block: bool = True, rules: dict | None = None):
+    session = Session(path, mood_mode, speed, fly_seconds, mood_cache, rules=rules)
 
     httpd = None
     for p in range(port, port + 20):

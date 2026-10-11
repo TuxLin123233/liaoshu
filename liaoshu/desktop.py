@@ -15,7 +15,7 @@ import os
 
 def run_native(path: str, port: int = 8770, speed: float = 1.0,
                mood_mode: str = "local", fly_seconds: int = 300,
-               mood_cache: str | None = None) -> None:
+               mood_cache: str | None = None, rules: dict | None = None) -> None:
     try:
         import webview
     except ImportError:
@@ -25,14 +25,14 @@ def run_native(path: str, port: int = 8770, speed: float = 1.0,
         from .server import serve
         serve(path, port=port, mood_mode=mood_mode, speed=speed,
               fly_seconds=fly_seconds, mood_cache=mood_cache,
-              open_browser=True)
+              open_browser=True, rules=rules)
         return
 
     from .server import serve
 
     url, httpd = serve(path, port=port, mood_mode=mood_mode, speed=speed,
                        fly_seconds=fly_seconds, mood_cache=mood_cache,
-                       open_browser=False, block=False)
+                       open_browser=False, block=False, rules=rules)
 
     title = f"聊书 · {os.path.splitext(os.path.basename(path))[0]}"
     window = webview.create_window(

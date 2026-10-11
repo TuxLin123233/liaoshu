@@ -72,8 +72,19 @@ def main() -> int:
     ap.add_argument("--mood-cache", default=None)
     ap.add_argument("--fly-seconds", type=int, default=300)
     ap.add_argument("--speed", type=float, default=1.0)
+    ap.add_argument("--rules", default=None,
+                    help="用户过滤规则文件（默认自动读 ~/.config/liaoshu/rules.json，"
+                         "Windows 为 %LOCALAPPDATA%\\liaoshu\\rules.json）")
+    ap.add_argument("--rules-init", action="store_true",
+                    help="生成一份示例规则文件并退出（想自己动过滤时用它）")
     args = ap.parse_args()
 
+    if args.rules_init:
+        from liaoshu.rules import init_rules_file
+        print("已生成示例规则：", init_rules_file(args.rules))
+        return 0
+
+    rules = _load(args.rules)
     book = args.book
     if not book:
         book = _pick_file(args.picker)
@@ -87,20 +98,26 @@ def main() -> int:
     if args.ui == "tk":
         from liaoshu import ui
         ui.run(book, mood_mode=args.mood, mood_cache=args.mood_cache,
-               fly_seconds=args.fly_seconds, speed=args.speed)
+               fly_seconds=args.fly_seconds, speed=args.speed, rules=rules)
         return 0
 
     if args.ui == "native":
         from liaoshu.desktop import run_native
         run_native(book, port=args.port, mood_mode=args.mood, speed=args.speed,
-                   fly_seconds=args.fly_seconds, mood_cache=args.mood_cache)
+                   fly_seconds=args.fly_seconds, mood_cache=args.mood_cache,
+                   rules=rules)
         return 0
 
     from liaoshu.server import serve
     serve(book, port=args.port, mood_mode=args.mood, speed=args.speed,
           fly_seconds=args.fly_seconds, mood_cache=args.mood_cache,
-          open_browser=not args.no_open)
+          open_browser=not args.no_open, rules=rules)
     return 0
+
+
+def _load(rules_arg: str | None) -> dict:
+    from liaoshu.rules import load_rules
+    return load_rules(rules_arg)
 
 
 if __name__ == "__main__":

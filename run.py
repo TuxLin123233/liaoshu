@@ -33,14 +33,25 @@ def main() -> int:
     ap.add_argument("--fly-seconds", type=int, default=300,
                     help="果蝇轨道生成多长（秒，按阅读时间算）")
     ap.add_argument("--speed", type=float, default=1.0, help="初始速度倍率")
+    ap.add_argument("--rules", default=None,
+                    help="用户过滤规则文件（默认自动读 ~/.config/liaoshu/rules.json，"
+                         "Windows 为 %LOCALAPPDATA%\\liaoshu\\rules.json）")
+    ap.add_argument("--rules-init", action="store_true",
+                    help="生成一份示例规则文件并退出（第一次想自己动过滤时用它）")
     ap.add_argument("--parse-only", action="store_true", help="只打印解析结果，不开界面")
     args = ap.parse_args()
+
+    if args.rules_init:
+        from liaoshu.rules import init_rules_file
+        print("已生成示例规则：", init_rules_file(args.rules))
+        return 0
 
     if args.parse_only:
         from liaoshu.parser import parse_file
         if not args.book:
             ap.error("--parse-only 需要给一个 txt 文件")
-        msgs = parse_file(args.book)
+        rules = _load(args.rules)
+        msgs = parse_file(args.book, rules=rules)
         from collections import Counter
         c = Counter(m.speaker for m in msgs if m.kind == "dialogue")
         print(f"{len(msgs)} 条消息 | 对话 {sum(1 for m in msgs if m.kind=='dialogue')} "
@@ -59,13 +70,15 @@ def main() -> int:
     if args.ui == "tk":
         from liaoshu import ui
         ui.run(args.book, mood_mode=args.mood, mood_cache=args.mood_cache,
-               fly_seconds=args.fly_seconds, speed=args.speed)
+               fly_seconds=args.fly_seconds, speed=args.speed,
+               rules=_load(args.rules))
         return 0
 
     if args.ui == "native":
         from liaoshu.desktop import run_native
         run_native(args.book, port=args.port, mood_mode=args.mood, speed=args.speed,
-                   fly_seconds=args.fly_seconds, mood_cache=args.mood_cache)
+                   fly_seconds=args.fly_seconds, mood_cache=args.mood_cache,
+                   rules=_load(args.rules))
         return 0
 
     if not os.path.isfile(args.book):
@@ -73,8 +86,14 @@ def main() -> int:
     from liaoshu.server import serve
     serve(args.book, port=args.port, mood_mode=args.mood, speed=args.speed,
           fly_seconds=args.fly_seconds, mood_cache=args.mood_cache,
-          open_browser=not args.no_open)
+          open_browser=not args.no_open, rules=_load(args.rules))
     return 0
+
+
+def _load(rules_arg: str | None) -> dict:
+    """入口统一从这里拿规则：给了路径用路径，没给就自动读用户配置。"""
+    from liaoshu.rules import load_rules
+    return load_rules(rules_arg)
 
 
 if __name__ == "__main__":

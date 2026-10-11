@@ -104,11 +104,27 @@ if os.path.exists(rs_path):
     top = [s for s, _n in __import__("collections").Counter(rs_sp).most_common(6)]
     check("《人生》主力角色占前六", {"加林", "巧珍", "亚萍"} <= set(top), f"前六 {top}")
     check("《人生》说话人以功能字收尾的假名清零",
-          not any(s[-1] in "手嘴轻想住告知惊玩叨断脸兄睛颤回硬摆母终怔般有舌先号父另溅解部一咽转怪吐"
+          not any(s[-1] in "手嘴轻想住告知惊玩叨断脸兄睛颤回硬摆母终怔般有舌先号父另溅解部一咽转怪吐张老鲁然"
                   for s in rs_sp),
-          f"残留 {sorted({s for s in rs_sp if s[-1] in '手嘴轻想住告知惊玩叨断脸兄睛颤回硬摆母终怔般有舌先号父另溅解部一咽转怪吐'})[:6]}")
+          f"残留 {sorted({s for s in rs_sp if s[-1] in '手嘴轻想住告知惊玩叨断脸兄睛颤回硬摆母终怔般有舌先号父另溅解部一咽转怪吐张老鲁然'})[:6]}")
+    # 用户规则：ban 整词禁用、letters 追加名尾禁字、map 改名合并
+    ruled = parse(open(rs_path, encoding="utf-8").read(),
+                  rules={"ban": ["身子往儿"], "letters": ["儿"],
+                         "map": {"高加林": "加林"}})
+    rsp = [m.speaker for m in ruled if m.kind == "dialogue" and m.speaker]
+    check("用户规则：ban/letters 把 身子往儿 清掉",
+          "身子往儿" not in rsp, "身子往儿 还在")
+    check("用户规则：map 把 高加林 并进 加林",
+          "高加林" not in rsp and "加林" in rsp, "改名未生效")
 else:
     check("《人生》长书回归（样本书未入库，本地存在时启用）", True, "跳过")
+
+# 呼格：`加林，你是不是…` 是在喊加林，说话人不该算加林
+voc = parse('“加林，你是不是身上不舒服？”她问。\n'
+            '“没有。”加林说。\n'
+            '“加林，吃饭了。”巧珍在门口喊。')
+vsp = [m.speaker for m in voc if m.kind == "dialogue"]
+check("呼格句不把被叫的人当说话人", voc and voc[0].speaker != "加林", str(voc[0].speaker))
 
 # 内嵌模式：桌面窗口把本地网页服务交给调用方持有，得能起、能关
 from liaoshu.server import serve
