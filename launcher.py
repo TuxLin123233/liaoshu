@@ -24,8 +24,72 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 
+def _pick_builtin(recents: list[str]) -> str | None:
+    """内置选择器：有最近打开就先摊出来，没有就直接文件对话框。"""
+    if not recents:
+        return _browse()
+    try:
+        import tkinter as tk
+        from tkinter import ttk
+    except Exception:                            # noqa: BLE001
+        return _browse()
+
+    root = tk.Tk()
+    root.title("聊书 · 选一本")
+    root.geometry("460x360")
+    root.minsize(360, 260)
+    chosen: dict[str, str | None] = {"path": None}
+
+    tk.Label(root, text="最近打开", anchor="w",
+             font=("", 10, "bold")).pack(fill="x", padx=12, pady=(12, 4))
+
+    box = tk.Listbox(root, activestyle="none", exportselection=False)
+    for p in recents:
+        box.insert("end", f"{os.path.basename(p)}    —    {os.path.dirname(p)}")
+    box.pack(fill="both", expand=True, padx=12)
+    if recents:
+        box.selection_set(0)
+
+    def open_selected(_e=None):
+        sel = box.curselection()
+        if sel:
+            chosen["path"] = recents[sel[0]]
+            root.destroy()
+
+    def browse():
+        root.destroy()
+        chosen["path"] = _browse()
+
+    box.bind("<Double-Button-1>", open_selected)
+    box.bind("<Return>", open_selected)
+
+    bar = tk.Frame(root)
+    bar.pack(fill="x", padx=12, pady=12)
+    ttk.Button(bar, text="打开", command=open_selected).pack(side="right")
+    ttk.Button(bar, text="浏览其他文件…", command=browse).pack(side="right", padx=(0, 8))
+    ttk.Button(bar, text="取消", command=root.destroy).pack(side="right", padx=(0, 8))
+    root.mainloop()
+    return chosen["path"]
+
+
+def _browse() -> str | None:
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        path = filedialog.askopenfilename(
+            title="选一本 txt", filetypes=[("文本", "*.txt"), ("全部", "*.*")])
+        root.destroy()
+        return path or None
+    except Exception:                            # noqa: BLE001
+        return None
+
+
 def _pick_file(style: str = "builtin") -> str | None:
     """内置选择器（tkinter）是默认；`native` 才先试系统原生框（zenity/kdialog）。"""
+    from liaoshu.recent import list_recent
+    recents = list_recent()
     if style == "native":
         choosers = [
             ["zenity", "--file-selection", "--title=选一本 txt 电子书",
@@ -42,17 +106,7 @@ def _pick_file(style: str = "builtin") -> str | None:
                     return path
             except (OSError, subprocess.TimeoutExpired):
                 continue
-    try:
-        import tkinter as tk
-        from tkinter import filedialog
-        root = tk.Tk()
-        root.withdraw()
-        path = filedialog.askopenfilename(
-            title="选一本 txt", filetypes=[("文本", "*.txt"), ("全部", "*.*")])
-        root.destroy()
-        return path or None
-    except Exception:                            # noqa: BLE001
-        return None
+    return _pick_builtin(recents)
 
 
 def main() -> int:
@@ -94,6 +148,9 @@ def main() -> int:
     if not os.path.isfile(book):
         print(f"找不到文件：{book}")
         return 1
+
+    from liaoshu.recent import add as _remember
+    _remember(book)
 
     if args.ui == "tk":
         from liaoshu import ui

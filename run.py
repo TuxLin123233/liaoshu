@@ -67,6 +67,10 @@ def main() -> int:
         else:
             ap.error("请给一个 txt 文件，例如：python3 run.py samples/夜航.txt")
 
+    if args.book and os.path.isfile(args.book):
+        from liaoshu.recent import add as _remember
+        _remember(args.book)
+
     if args.ui == "tk":
         from liaoshu import ui
         ui.run(args.book, mood_mode=args.mood, mood_cache=args.mood_cache,

@@ -140,6 +140,31 @@ finally:
     httpd.server_close()
 check("内嵌模式 httpd 能干净关停", True, "shutdown()")
 
+# 最近打开：去重、置顶、过滤不存在的文件（用临时配置目录，不碰真实记录）
+import tempfile
+_old_xdg = os.environ.get("XDG_CONFIG_HOME")
+os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp()
+try:
+    from liaoshu import recent
+    recent.clear()
+    recent.add(os.path.join(ROOT, "samples", "夜航.txt"))
+    recent.add("/no/such/book.txt")
+    recent.add(os.path.join(ROOT, "samples", "夜航.txt"))
+    got = [os.path.basename(p) for p in recent.list_recent()]
+    check("最近打开：去重、置顶、过滤失效文件", got == ["夜航.txt"], str(got))
+    recent.clear()
+finally:
+    if _old_xdg is None:
+        os.environ.pop("XDG_CONFIG_HOME", None)
+    else:
+        os.environ["XDG_CONFIG_HOME"] = _old_xdg
+
+# 续读：快照要带一个稳定的 bookId（客户端按它存"读到第几条"）
+from liaoshu.server import Session
+_bid1 = Session(os.path.join(ROOT, "samples", "夜航.txt")).snapshot()["bookId"]
+_bid2 = Session(os.path.join(ROOT, "samples", "夜航.txt")).snapshot()["bookId"]
+check("快照带稳定 bookId（续读用）", bool(_bid1) and _bid1 == _bid2, _bid1)
+
 # --------------------------------------------------------------------------
 print("\n[2] 时序：确定性")
 personas = build_personas(msgs)

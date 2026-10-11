@@ -34,6 +34,17 @@ MIME = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
         ".png": "image/png", ".ico": "image/x-icon"}
 
 
+def _book_id(path: str) -> str:
+    """一本书的稳定标识：绝对路径 + 文件大小。同名不同内容也不会串进度。"""
+    import hashlib
+    raw = os.path.abspath(path)
+    try:
+        raw += f"|{os.stat(path).st_size}"
+    except OSError:
+        pass
+    return hashlib.sha1(raw.encode("utf-8", "surrogatepass")).hexdigest()[:16]
+
+
 class Session:
     """一本书 + 一个播放器 + 若干 SSE 订阅者。"""
 
@@ -42,6 +53,7 @@ class Session:
                  rules: dict | None = None):
         self.path = path
         self.rules = rules
+        self.book_id = _book_id(path)
         self.lock = threading.RLock()
         self.clients: set[queue.Queue] = set()
         self.pending: list[dict] = []
@@ -268,6 +280,7 @@ class Session:
             return {
                 "t": "init",
                 "book": os.path.basename(self.path),
+                "bookId": self.book_id,
                 "total": len(self.messages),
                 "messages": [{"k": m.kind, "x": m.text, "s": m.speaker,
                               "g": m.confidence == "guess"} for m in self.messages],

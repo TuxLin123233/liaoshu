@@ -120,6 +120,7 @@ const S = {
   rows: new Map(), inner: null, stream: null,
   delivered: 0, shown: 0, total: 0, playing: false, narration: true,
   auto: true, prefix: [], typingEl: null, scrubbing: false, partial: null,
+  bookId: null, _restored: false, _savedAt: 0,
 };
 
 const MAX_ROWS = 260;
@@ -327,11 +328,41 @@ function handle(ev) {
   }
 }
 
+/* 续读：按书 id 把"读到第几条"存在本地，下次打开自动接上 */
+function posKey(id) { return 'liaoshu.pos.' + id; }
+
+function saveProgress(force) {
+  if (!S.bookId || !S._restored) return;   // 恢复动作完成前不落盘，免得把手头存档抹了
+  const now = Date.now();
+  if (!force && now - S._savedAt < 1000) return;   // 自动落盘最多每秒一次
+  S._savedAt = now;
+  try {
+    if (S.delivered <= 0 || (S.total && S.delivered >= S.total)) {
+      localStorage.removeItem(posKey(S.bookId));   // 开头或读完 → 不记
+    } else {
+      localStorage.setItem(posKey(S.bookId), String(S.delivered));
+    }
+  } catch (e) { /* 无痕模式 */ }
+}
+
+function restoreProgress(d) {
+  if (!d.bookId) return;
+  let saved = 0;
+  try { saved = parseInt(localStorage.getItem(posKey(d.bookId)), 10) || 0; } catch (e) {}
+  // 只在"全新会话还停在开头"时恢复；重连/进行中的会话不打断
+  if (saved > 0 && saved < d.total && d.delivered === 0) {
+    S._resumeTo = saved;
+    send('seek', { delivered: saved, resume: false });
+    $('book').textContent = `${d.book} · 续读到 ${saved}/${d.total}`;
+  }
+}
+
 function onInit(d) {
   S.messages = d.messages; S.personas = d.personas;
   S.cast = d.cast; S.chapters = d.chapters; S.total = d.total;
   S.delivered = d.delivered; S.shown = d.shown; S.playing = d.playing;
   S.narration = d.narration;
+  S.bookId = d.bookId;
   buildClock();
 
   $('book').textContent = `${d.book} · ${d.total} 条`;
@@ -351,6 +382,7 @@ function onInit(d) {
     if (row._bubble) row._bubble.textContent = S.messages[d.delivered].x.slice(0, d.shown);
   }
   onProgress(d.delivered, d.total);
+  if (!S._restored) { S._restored = true; restoreProgress(d); }
   setTimeout(() => maybeScroll(true), 30);
 }
 
@@ -411,6 +443,7 @@ function onSeek(delivered) {
   dropFrom(delivered);
   renderRange(Math.max(0, delivered - PAGE), delivered, true);
   maybeScroll(true);
+  saveProgress(true);
 }
 
 function onProgress(delivered, total) {
@@ -418,7 +451,9 @@ function onProgress(delivered, total) {
     $('progress').max = Math.max(total, 1);
     $('progress').value = delivered;
   }
-  S.delivered = delivered; S.total = total;
+  S.delivered = delivered;
+  if (total) S.total = total;
+  saveProgress();
 }
 
 function onStatus(s) {
