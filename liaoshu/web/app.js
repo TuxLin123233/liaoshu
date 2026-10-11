@@ -143,6 +143,9 @@ const ICONS = {
   mute: '<path d="M3.6 6.2v3.6h2.3L9 12.4V3.6L5.9 6.2z"/>'
       + '<path d="M11.6 6.6l3 2.8M14.6 6.6l-3 2.8"/>',
   theme: '<circle cx="8" cy="8" r="5.4"/><path d="M8 2.6a5.4 5.4 0 0 0 0 10.8z" fill="currentColor" stroke="none"/>',
+  gear: '<circle cx="8" cy="8" r="2.3"/>'
+      + '<path d="M8 1.7v1.5M8 12.8v1.5M1.7 8h1.5M12.8 8h1.5'
+      + 'M3.5 3.5l1.1 1.1M11.4 11.4l1.1 1.1M12.5 3.5l-1.1 1.1M4.6 11.4l-1.1 1.1"/>',
 };
 
 function svg(name, size) {
@@ -373,6 +376,7 @@ function onInit(d) {
   $('progress').max = Math.max(d.total, 1);
 
   buildSidebar();
+  buildJump();
   S.rows.forEach((el) => el.remove());
   S.rows.clear();
   hideTyping();
@@ -384,6 +388,30 @@ function onInit(d) {
   onProgress(d.delivered, d.total);
   if (!S._restored) { S._restored = true; restoreProgress(d); }
   setTimeout(() => maybeScroll(true), 30);
+}
+
+/* 章节快速跳转：顶栏常驻下拉，窄屏侧栏隐藏时也能用 */
+function buildJump() {
+  const sel = $('jump');
+  sel.innerHTML = '';
+  const head = document.createElement('option');
+  head.value = '';
+  head.textContent = S.chapters.length ? '章节…' : '无章节';
+  sel.appendChild(head);
+  for (const c of S.chapters) {
+    const o = document.createElement('option');
+    o.value = String(c.idx);
+    o.textContent = c.text.replace(/\s+/g, ' ').trim().slice(0, 20);
+    sel.appendChild(o);
+  }
+  sel.disabled = !S.chapters.length;
+}
+
+function syncJump(idx) {
+  if (!S.chapters.length) return;
+  let cur = '';
+  for (const c of S.chapters) { if (c.idx <= idx) cur = String(c.idx); else break; }
+  $('jump').value = cur;
 }
 
 function buildSidebar() {
@@ -443,6 +471,7 @@ function onSeek(delivered) {
   dropFrom(delivered);
   renderRange(Math.max(0, delivered - PAGE), delivered, true);
   maybeScroll(true);
+  syncJump(delivered);
   saveProgress(true);
 }
 
@@ -453,6 +482,7 @@ function onProgress(delivered, total) {
   }
   S.delivered = delivered;
   if (total) S.total = total;
+  syncJump(delivered);
   saveProgress();
 }
 
@@ -517,7 +547,20 @@ function bindControls() {
   $('restart').innerHTML = svg('restart') + ' 重来';
   $('theme').innerHTML = svg('theme');
   $('sound').innerHTML = svg('mute');
+  $('settings').innerHTML = svg('gear');
   setPlayBtn(false);
+
+  $('settings').onclick = (e) => {
+    e.stopPropagation();
+    $('pop').hidden = !$('pop').hidden;
+  };
+  $('pop').onclick = (e) => e.stopPropagation();
+  document.addEventListener('click', () => { if (!$('pop').hidden) $('pop').hidden = true; });
+
+  $('jump').onchange = (e) => {
+    const idx = parseInt(e.target.value, 10);
+    if (!isNaN(idx)) send('seek', { delivered: idx, resume: true });
+  };
 
   $('play').onclick = () => send('toggle');
   $('rewind').onclick = () => send('rewind', { n: 1 });
