@@ -160,6 +160,10 @@ try:
         x, y, width, height = 130, 90, 1111, 777
     _save_geom(_Win())
     check("原生窗口几何：存了能读回", _load_geom() == (130, 90, 1111, 777), str(_load_geom()))
+
+    from liaoshu.ui import _load_font_delta, _save_font_delta
+    _save_font_delta(4)
+    check("tk 字号偏移：存了能读回", _load_font_delta() == 4, str(_load_font_delta()))
 finally:
     if _old_xdg is None:
         os.environ.pop("XDG_CONFIG_HOME", None)

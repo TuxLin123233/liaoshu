@@ -56,12 +56,37 @@ def _short_note(note: str) -> str:
     return f"· CV {m.group(1)}% 自相关 {m.group(2)}" if m else ""
 
 
+def _ui_pref_path() -> str:
+    from .rules import config_dir
+    return os.path.join(config_dir(), "ui.json")
+
+
+def _load_font_delta() -> int:
+    import json
+    try:
+        with open(_ui_pref_path(), "r", encoding="utf-8") as f:
+            return int(json.load(f).get("font_delta", 0))
+    except (OSError, ValueError, TypeError, AttributeError):
+        return 0
+
+
+def _save_font_delta(d: int) -> None:
+    import json
+    try:
+        os.makedirs(os.path.dirname(_ui_pref_path()), exist_ok=True)
+        with open(_ui_pref_path(), "w", encoding="utf-8") as f:
+            json.dump({"font_delta": int(d)}, f)
+    except OSError:
+        pass
+
+
 class ChatBookApp:
     def __init__(self, root: tk.Tk, path: str | None = None,
                  mood_mode: str = "local", mood_cache: str | None = None,
                  fly_seconds: int = 300, speed: float = 1.0, rules=None):
         self.root = root
         self.font = pick_font()
+        self.font_delta = _load_font_delta()
         self.init_speed = speed
         self.mood_mode = mood_mode
         self._rules = rules
@@ -119,6 +144,10 @@ class ChatBookApp:
         b.pack(side="left", padx=5, pady=6)
         return b
 
+    def _fs(self, base: int) -> int:
+        """正文字号 = 基准 + 用户偏移（A−/A+ 调，记在配置里）。"""
+        return max(7, base + self.font_delta)
+
     def _build_ui(self):
         self.root.title("liaoshu · 群聊式电子书")
         self.root.configure(bg=BG)
@@ -133,6 +162,8 @@ class ChatBookApp:
         self._btn(bar, "⏪ 回退", self.do_rewind)
         self._btn(bar, "⏭ 跳过", self.do_skip)
         self._btn(bar, "⏮ 重来", self.do_restart)
+        self._btn(bar, "A−", lambda: self.font_step(-1), width=2)
+        self._btn(bar, "A+", lambda: self.font_step(1), width=2)
 
         tk.Label(bar, text="速度", bg=BG, fg=FG_DIM,
                  font=(self.font, 10)).pack(side="left", padx=(14, 4))
@@ -221,10 +252,64 @@ class ChatBookApp:
     # 载入
     # ------------------------------------------------------------------
     def open_dialog(self):
-        p = filedialog.askopenfilename(
-            title="选一本 txt", filetypes=[("文本", "*.txt"), ("全部", "*.*")])
-        if p:
-            self.load(p)
+        from .recent import add as _remember, list_recent
+        recents = list_recent()
+        chosen: dict[str, object] = {"path": None, "browse": False}
+        if recents:
+            self._recent_dialog(recents, chosen)
+        if chosen["browse"]:
+            chosen["path"] = filedialog.askopenfilename(
+                title="选一本 txt",
+                filetypes=[("文本", "*.txt"), ("全部", "*.*")]) or None
+        if chosen["path"]:
+            _remember(str(chosen["path"]))
+            self.load(str(chosen["path"]))
+
+    def _recent_dialog(self, recents, chosen):
+        top = tk.Toplevel(self.root)
+        top.title("聊书 · 选一本")
+        top.configure(bg=BG)
+        top.geometry("480x380")
+        top.transient(self.root)
+
+        tk.Label(top, text="最近打开", bg=BG, fg=FG, anchor="w",
+                 font=(self.font, self._fs(11), "bold")).pack(
+                     fill="x", padx=12, pady=(12, 4))
+        box = tk.Listbox(top, activestyle="none", exportselection=False,
+                         bg=BG_RAISED, fg=FG, highlightthickness=0, bd=0,
+                         selectbackground=ACCENT, selectforeground="#0B0B0C",
+                         font=(self.font, self._fs(10)))
+        for p in recents:
+            box.insert("end", f"{os.path.basename(p)}    —    {os.path.dirname(p)}")
+        box.pack(fill="both", expand=True, padx=12)
+        box.selection_set(0)
+
+        def open_selected(_e=None):
+            sel = box.curselection()
+            if sel:
+                chosen["path"] = recents[sel[0]]
+            top.destroy()
+
+        def browse():
+            chosen["browse"] = True
+            top.destroy()
+
+        box.bind("<Double-Button-1>", open_selected)
+        box.bind("<Return>", open_selected)
+
+        bar = tk.Frame(top, bg=BG)
+        bar.pack(fill="x", padx=12, pady=12)
+        for text, cmd, side, pad in (
+                ("打开", open_selected, "right", 0),
+                ("浏览其他文件…", browse, "right", 8),
+                ("取消", top.destroy, "right", 8)):
+            tk.Button(bar, text=text, command=cmd, bg=BG_RAISED, fg=FG,
+                      activebackground=BG_HOVER, activeforeground=FG,
+                      relief="flat", bd=0, padx=12, pady=4, cursor="hand2",
+                      font=(self.font, 10), highlightthickness=0,
+                      takefocus=0).pack(side=side, padx=(0, pad))
+        top.grab_set()
+        self.root.wait_window(top)
 
     def load(self, path: str):
         try:
@@ -287,7 +372,7 @@ class ChatBookApp:
             is_chap = msg.kind == "chapter"
             lbl = tk.Label(row, text=txt, bg=BG,
                            fg=FG_DIM if msg.kind == "narration" else "#B9BEC7",
-                           font=(self.font, 10, "italic" if msg.kind == "narration" else "bold"),
+                           font=(self.font, self._fs(10), "italic" if msg.kind == "narration" else "bold"),
                            justify="center", wraplength=self._wrap(), pady=4)
             lbl.pack(anchor="center", fill="x")
             self._bubble_labels.append(lbl)
@@ -301,7 +386,7 @@ class ChatBookApp:
 
         p = persona_for(self.personas, msg.speaker)
         tk.Label(row, text=p.avatar, bg=p.color, fg="#101114", width=2, height=1,
-                 font=(self.font, 13, "bold")).pack(side="left", anchor="n", padx=(0, 8))
+                 font=(self.font, self._fs(13), "bold")).pack(side="left", anchor="n", padx=(0, 8))
 
         box = tk.Frame(row, bg=BG)
         box.pack(side="left", fill="x", expand=True, anchor="w")
@@ -309,15 +394,15 @@ class ChatBookApp:
         head = tk.Frame(box, bg=BG)
         head.pack(anchor="w", fill="x")
         tk.Label(head, text=str(msg.speaker) + ("?" if msg.confidence == "guess" else ""),
-                 bg=BG, fg=p.color, font=(self.font, 9)).pack(side="left")
+                 bg=BG, fg=p.color, font=(self.font, self._fs(9))).pack(side="left")
         try:
             tstr = self._fake_clock(self.player.message_time(idx) if idx <= self.player.delivered else 0)
         except Exception:                            # noqa: BLE001
             tstr = ""
         tk.Label(head, text="  " + tstr, bg=BG, fg="#5C6169",
-                 font=(self.font, 8)).pack(side="left")
+                 font=(self.font, self._fs(8))).pack(side="left")
 
-        bubble = tk.Label(box, text="", bg=BG_RAISED, fg=FG, font=(self.font, 11),
+        bubble = tk.Label(box, text="", bg=BG_RAISED, fg=FG, font=(self.font, self._fs(11)),
                           justify="left", anchor="w", wraplength=self._wrap(),
                           padx=10, pady=6)
         bubble.pack(anchor="w", pady=(1, 0))
@@ -404,9 +489,9 @@ class ChatBookApp:
         row = tk.Frame(self.inner, bg=BG)
         row.pack(fill="x", padx=14, pady=2, anchor="w")
         tk.Label(row, text=p.avatar, bg=p.color, fg="#101114", width=2, height=1,
-                 font=(self.font, 13, "bold")).pack(side="left", anchor="n", padx=(0, 8))
+                 font=(self.font, self._fs(13), "bold")).pack(side="left", anchor="n", padx=(0, 8))
         lbl = tk.Label(row, text=f"　{msg.speaker} 正在输入", bg=BG, fg=FG_DIM,
-                       font=(self.font, 10, "italic"))
+                       font=(self.font, self._fs(10), "italic"))
         lbl.pack(side="left", anchor="w", pady=2)
         self._typing_row = row
         self._typing_label = lbl
@@ -483,6 +568,17 @@ class ChatBookApp:
         self.player.seek(0, resume=True)
         self.btn_play.configure(text="⏸  暂停")
         self._autoscroll = True
+
+    def font_step(self, d: int):
+        """调正文字号：改动记进配置，重画当前可见的消息。"""
+        self.font_delta = max(-3, min(12, self.font_delta + d))
+        _save_font_delta(self.font_delta)
+        if not self.messages:
+            return
+        # 重画：先撤掉可见行，再按新字号补回来（和跳转同一套渲染）
+        self.on_seek(self.player.delivered)
+        self._autoscroll = True
+        self._autoscroll_maybe(force=True)
 
     def on_speed(self, _=None):
         if not self.messages:
