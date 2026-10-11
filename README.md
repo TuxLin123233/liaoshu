@@ -61,10 +61,18 @@ python3 tools/install_desktop.py --uninstall
 **Windows 打包成可执行文件**（不用装 Python、双击即用）：
 
 ```bat
-:: 在 Windows 上：进项目目录，双击
+:: 在一台 Windows 上：进项目目录，双击
 packaging\build_windows.bat
-:: 产物 dist\liaoshu.exe（无需装 Python；Win10/11 自带 WebView2 运行时）
+:: 脚本会自己装 pywebview + pyinstaller，产物是单个 dist\liaoshu.exe
 ```
+
+打出来的 `dist\liaoshu.exe` 可以直接发给别人：双击 → 选书窗口 → 原生聊天窗口，
+**对方不需要装 Python**。运行环境要 Windows 10/11 自带的 WebView2；老系统装一次
+「Microsoft Edge WebView2 Runtime」即可。想给 exe 换图标，把 `packaging/liaoshu.ico`
+放进去再打包（脚本会自动用它）。
+
+> 注意：PyInstaller 不能跨平台，Linux 上打不出 Windows 的 exe——必须在 Windows 上跑这个 bat。
+> （Linux 想要"点图标就开"用 `tools/install_desktop.py`，不需要打包。）
 
 一个 exe 双击 → 选书窗口 → 原生聊天窗口，没有控制台黑框。
 

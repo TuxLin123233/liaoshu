@@ -15,12 +15,17 @@ Linux 打包只要去掉 console 相关即可（Qt/GTK 后端和 WebView2 无关
 """
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+import os
 
 datas = collect_data_files("liaoshu", include_py_files=False)
 # tools/fly_mood.py 会被 --mood fly 当子进程脚本运行，得跟着走
 datas += [("tools/fly_mood.py", "tools")]
 
 hiddenimports = collect_submodules("webview")
+
+# 有 .ico 就用它当图标（想换图标：把 packaging/liaoshu.ico 放进来即可）
+_ICON = os.path.join("packaging", "liaoshu.ico")
+icon = _ICON if os.path.exists(_ICON) else None
 
 a = Analysis(
     ["launcher.py"],
@@ -53,5 +58,5 @@ exe = EXE(
     upx=False,
     console=False,          # 双击不弹黑框
     disable_windowed_traceback=False,
-    icon="packaging/liaoshu.ico" if False else None,
+    icon=icon,
 )
