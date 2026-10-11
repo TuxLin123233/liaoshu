@@ -4,9 +4,10 @@
 给桌面图标 / 文件管理器（`用聊书打开`）用的入口：
 
     python3 launcher.py 某本.txt          # 直接开这本
-    python3 launcher.py                    # 没给书 → 弹系统选书窗口
+    python3 launcher.py                    # 没给书 → 弹内置选书窗口
     python3 launcher.py 某本.txt --ui tk   # 其余参数和 run.py 完全一样
     python3 launcher.py --ui native        # 弹选书 → pywebview 原生窗口打开
+    python3 launcher.py --picker native    # 选书优先用系统原生框（zenity/kdialog）
 
 读取参数的行为和 run.py 保持一致，唯一差别是：**没给书时不报错**，
 而是先弹一个选书对话框，选中了才开始。这是"桌面双击就能用"的前提。
@@ -23,23 +24,24 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 
-def _pick_file() -> str | None:
-    """优先系统原生对话框（zenity / kdialog），没有就退回 tkinter。"""
-    choosers = [
-        ["zenity", "--file-selection", "--title=选一本 txt 电子书",
-         "--file-filter", "txt 电子书 (*.txt)", "*.txt"],
-        ["kdialog", "--getopenfilename", os.path.expanduser("~"),
-         "*.txt|TXT 电子书"],
-    ]
-    for cmd in choosers:
-        try:
-            proc = subprocess.run(cmd, capture_output=True,
-                                  text=True, timeout=60)
-            path = (proc.stdout or "").strip()
-            if path and os.path.isfile(path):
-                return path
-        except (OSError, subprocess.TimeoutExpired):
-            continue
+def _pick_file(style: str = "builtin") -> str | None:
+    """内置选择器（tkinter）是默认；`native` 才先试系统原生框（zenity/kdialog）。"""
+    if style == "native":
+        choosers = [
+            ["zenity", "--file-selection", "--title=选一本 txt 电子书",
+             "--file-filter", "txt 电子书 (*.txt)", "*.txt"],
+            ["kdialog", "--getopenfilename", os.path.expanduser("~"),
+             "*.txt|TXT 电子书"],
+        ]
+        for cmd in choosers:
+            try:
+                proc = subprocess.run(cmd, capture_output=True,
+                                      text=True, timeout=60)
+                path = (proc.stdout or "").strip()
+                if path and os.path.isfile(path):
+                    return path
+            except (OSError, subprocess.TimeoutExpired):
+                continue
     try:
         import tkinter as tk
         from tkinter import filedialog
@@ -61,6 +63,9 @@ def main() -> int:
     ap.add_argument("--ui", choices=["web", "tk", "native"], default=default_ui,
                     help="web=网页界面；tk=零依赖 tkinter 界面；"
                          "native=pywebview 原生窗口（需 pip install pywebview）")
+    ap.add_argument("--picker", choices=["builtin", "native"], default="builtin",
+                    help="选书用哪种文件选择器：builtin=内置（默认，跨平台一致）；"
+                         "native=先试系统原生框（zenity/kdialog）再退回内置")
     ap.add_argument("--port", type=int, default=8770)
     ap.add_argument("--no-open", action="store_true")
     ap.add_argument("--mood", choices=["local", "fly", "hybrid"], default="local")
@@ -71,7 +76,7 @@ def main() -> int:
 
     book = args.book
     if not book:
-        book = _pick_file()
+        book = _pick_file(args.picker)
         if not book:
             print("没选到书。也可以直接命令行给：python3 launcher.py 某本.txt")
             return 1
