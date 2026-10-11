@@ -284,14 +284,18 @@ class ChatBookApp:
 
         if msg.kind in ("narration", "chapter"):
             txt = msg.text
+            is_chap = msg.kind == "chapter"
             lbl = tk.Label(row, text=txt, bg=BG,
                            fg=FG_DIM if msg.kind == "narration" else "#B9BEC7",
                            font=(self.font, 10, "italic" if msg.kind == "narration" else "bold"),
                            justify="center", wraplength=self._wrap(), pady=4)
             lbl.pack(anchor="center", fill="x")
             self._bubble_labels.append(lbl)
-            if msg.kind == "chapter":
+            if is_chap:
                 tk.Frame(row, bg=BORDER, height=1).pack(fill="x", pady=(0, 4))
+                # 点章节标题直接跳过去（和网页端侧栏目录一个意思）
+                lbl.configure(cursor="hand2")
+                lbl.bind("<Button-1>", lambda e, i=idx: self.player.seek(i, resume=True))
             self._rows[idx] = row
             return row
 

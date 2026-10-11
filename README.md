@@ -52,9 +52,11 @@ python3 tools/install_desktop.py            # 装到 ~/.local/share/，生成「
 python3 tools/install_desktop.py --uninstall
 ```
 
-装完后应用菜单搜「聊书」就能开；直接双击会弹系统选书窗口，选中一本才开始。
+装完后应用菜单搜「聊书」就能开；直接双击会弹选书窗口，选中一本才开始。
+装了 pywebview 就默认开**原生窗口**，没装则自动退回浏览器；想强制走浏览器加
+`--ui web`。
 不想装桌面项，也可以 `python3 launcher.py 某本.txt` —— 和 `run.py` 唯一的区别是
-**不给书时会弹选书对话框而不是报错**。
+**不给书时会弹选书对话框而不是报错**（并列出"最近打开"）。
 
 **Windows 打包成可执行文件**（不用装 Python、双击即用）：
 

@@ -109,11 +109,24 @@ def _pick_file(style: str = "builtin") -> str | None:
     return _pick_builtin(recents)
 
 
+def _default_ui() -> str:
+    """没指定 --ui 时的默认：装了 pywebview 且有显示 → 原生窗口；否则网页。"""
+    if getattr(sys, "frozen", False):
+        return "native"
+    try:
+        import webview  # noqa: F401
+    except ImportError:
+        return "web"
+    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        return "web"
+    return "native"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(prog="launcher.py", description="群聊式 txt 电子书阅读器（选书启动）")
     ap.add_argument("book", nargs="?", help="txt 文件路径（不给就弹选书窗口）")
-    # 打成 exe/AppImage 的"软件"默认直接开原生窗口；源码里跑还按老习惯走浏览器
-    default_ui = "native" if getattr(sys, "frozen", False) else "web"
+    # 装了原生窗口依赖就直接用它（点桌面图标的体验）；没有就退回浏览器
+    default_ui = _default_ui()
     ap.add_argument("--ui", choices=["web", "tk", "native"], default=default_ui,
                     help="web=网页界面；tk=零依赖 tkinter 界面；"
                          "native=pywebview 原生窗口（需 pip install pywebview）")
