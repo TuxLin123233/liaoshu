@@ -412,7 +412,7 @@ def make_handler(session: Session):
 
 def serve(path: str, port: int = 8770, mood_mode: str = "local", speed: float = 1.0,
           fly_seconds: int = 300, mood_cache: str | None = None,
-          open_browser: bool = True) -> None:
+          open_browser: bool = True, block: bool = True):
     session = Session(path, mood_mode, speed, fly_seconds, mood_cache)
 
     httpd = None
@@ -432,6 +432,11 @@ def serve(path: str, port: int = 8770, mood_mode: str = "local", speed: float = 
           f"· 节奏源 {session.mood_mode}")
     print(f"  → {url}")
     print("  Ctrl-C 退出")
+
+    if not block:
+        # 内嵌模式：httpd 由调用方持有，退出循环交给桌面窗口管
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        return url, httpd
 
     if open_browser:
         threading.Timer(0.6, lambda: _open(url)).start()

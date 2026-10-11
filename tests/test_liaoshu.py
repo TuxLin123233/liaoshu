@@ -110,6 +110,20 @@ if os.path.exists(rs_path):
 else:
     check("《人生》长书回归（样本书未入库，本地存在时启用）", True, "跳过")
 
+# 内嵌模式：桌面窗口把本地网页服务交给调用方持有，得能起、能关
+from liaoshu.server import serve
+url, httpd = serve(os.path.join(ROOT, "samples", "夜航.txt"),
+                   port=9961, open_browser=False, block=False)
+try:
+    import urllib.request
+    with urllib.request.urlopen(url, timeout=5) as r:
+        body = r.read(200)
+    check("内嵌模式起服并能出首页", r.status == 200 and b"<" in body, str(r.status))
+finally:
+    httpd.shutdown()
+    httpd.server_close()
+check("内嵌模式 httpd 能干净关停", True, "shutdown()")
+
 # --------------------------------------------------------------------------
 print("\n[2] 时序：确定性")
 personas = build_personas(msgs)

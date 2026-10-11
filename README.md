@@ -28,9 +28,22 @@ cd liaoshu
 python3 run.py samples/夜航.txt          # 自动开浏览器，监听 127.0.0.1:8770
 python3 run.py 某本书.txt --speed 2.5
 python3 run.py 某本书.txt --mood fly     # 用果蝇连接组当节奏的慢变量
+python3 run.py 某本书.txt --ui native    # 原生窗口（需 pip install pywebview）
 python3 run.py 某本书.txt --ui tk        # 退回零依赖的 tkinter 界面
 python3 run.py --parse-only 某本书.txt    # 只看解析结果，不开界面
 ```
+
+**原生窗口版**（想当"软件"而不是开浏览器）：
+pywebview 把本地网页包成一个独立窗口，Linux 走 WebKitGTK、Windows 走
+系统自带的 Edge WebView2；窗口关掉服务就停，不留后台。装法：
+
+```bash
+pip install pywebview              # 也可以 --user 装
+python3 launcher.py --ui native    # 弹选书 → 原生窗口
+# 或直接 python3 run.py 某本.txt --ui native
+```
+
+没装 pywebview 时 `--ui native` 会提示并自动退回系统浏览器。
 
 **桌面一键启动**（Linux：双击图标、应用菜单、右键 txt → 打开方式）：
 
@@ -42,6 +55,16 @@ python3 tools/install_desktop.py --uninstall
 装完后应用菜单搜「聊书」就能开；直接双击会弹系统选书窗口，选中一本才开始。
 不想装桌面项，也可以 `python3 launcher.py 某本.txt` —— 和 `run.py` 唯一的区别是
 **不给书时会弹选书对话框而不是报错**。
+
+**Windows 打包成可执行文件**（不用装 Python、双击即用）：
+
+```bat
+:: 在 Windows 上：进项目目录，双击
+packaging\build_windows.bat
+:: 产物 dist\liaoshu.exe（无需装 Python；Win10/11 自带 WebView2 运行时）
+```
+
+一个 exe 双击 → 选书窗口 → 原生聊天窗口，没有控制台黑框。
 
 为什么是"本地服务 + 浏览器"而不是桌面控件：DeepSeek 那套设计是**靠 CSS 变量驱动的**
 （14 个 `--dsw-alias-*` 令牌，每个都要求明暗两套值），tkinter 消费不了。
@@ -226,11 +249,15 @@ liaoshu/
 │   ├── rhythm.py               三层节奏模型 + 确定性播放器
 │   ├── mood.py                 慢变量：本地 OU / flybrain 轨道 / 两者相乘
 │   ├── server.py               本地 HTTP + SSE（标准库，无第三方依赖）
+│   ├── desktop.py              pywebview 原生窗口（--ui native）
 │   ├── web/
 │   │   ├── index.html          界面骨架（--BOOT-- 处嵌入首屏快照）
 │   │   ├── style.css           DeepSeek 设计令牌 + 布局
 │   │   └── app.js              SSE 客户端、渲染、Web Audio 音效
 │   └── ui.py                   旧 tkinter 界面（--ui tk，保留作无浏览器时的退路）
+├── packaging/
+│   ├── liaoshu.spec            PyInstaller 打包配置（console=False）
+│   └── build_windows.bat       Windows 一键打包成 dist\liaoshu.exe
 ├── tools/
 │   ├── install_desktop.py      装/卸 ~/.local/share/applications/liaoshu.desktop
 │   ├── liaoshu.svg             应用图标

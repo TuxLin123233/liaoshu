@@ -6,6 +6,7 @@
     python3 launcher.py 某本.txt          # 直接开这本
     python3 launcher.py                    # 没给书 → 弹系统选书窗口
     python3 launcher.py 某本.txt --ui tk   # 其余参数和 run.py 完全一样
+    python3 launcher.py --ui native        # 弹选书 → pywebview 原生窗口打开
 
 读取参数的行为和 run.py 保持一致，唯一差别是：**没给书时不报错**，
 而是先弹一个选书对话框，选中了才开始。这是"桌面双击就能用"的前提。
@@ -55,8 +56,11 @@ def _pick_file() -> str | None:
 def main() -> int:
     ap = argparse.ArgumentParser(prog="launcher.py", description="群聊式 txt 电子书阅读器（选书启动）")
     ap.add_argument("book", nargs="?", help="txt 文件路径（不给就弹选书窗口）")
-    ap.add_argument("--ui", choices=["web", "tk"], default="web",
-                    help="web=网页界面（默认）；tk=零依赖 tkinter 界面")
+    # 打成 exe/AppImage 的"软件"默认直接开原生窗口；源码里跑还按老习惯走浏览器
+    default_ui = "native" if getattr(sys, "frozen", False) else "web"
+    ap.add_argument("--ui", choices=["web", "tk", "native"], default=default_ui,
+                    help="web=网页界面；tk=零依赖 tkinter 界面；"
+                         "native=pywebview 原生窗口（需 pip install pywebview）")
     ap.add_argument("--port", type=int, default=8770)
     ap.add_argument("--no-open", action="store_true")
     ap.add_argument("--mood", choices=["local", "fly", "hybrid"], default="local")
@@ -79,6 +83,12 @@ def main() -> int:
         from liaoshu import ui
         ui.run(book, mood_mode=args.mood, mood_cache=args.mood_cache,
                fly_seconds=args.fly_seconds, speed=args.speed)
+        return 0
+
+    if args.ui == "native":
+        from liaoshu.desktop import run_native
+        run_native(book, port=args.port, mood_mode=args.mood, speed=args.speed,
+                   fly_seconds=args.fly_seconds, mood_cache=args.mood_cache)
         return 0
 
     from liaoshu.server import serve

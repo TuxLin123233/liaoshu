@@ -6,6 +6,7 @@
     python3 run.py samples/夜航.txt --no-open    # 不自动开浏览器，只打印地址
     python3 run.py samples/夜航.txt --mood fly   # 用果蝇连接组当节奏的慢变量
     python3 run.py samples/夜航.txt --ui tk      # 退回零依赖的 tkinter 界面
+    python3 run.py samples/夜航.txt --ui native  # pywebview 原生窗口（要 pip install pywebview）
     python3 run.py --parse-only 某本书.txt        # 只看解析结果，不开界面
 """
 
@@ -21,8 +22,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 def main() -> int:
     ap = argparse.ArgumentParser(description="群聊式 txt 电子书阅读器")
     ap.add_argument("book", nargs="?", help="txt 文件路径")
-    ap.add_argument("--ui", choices=["web", "tk"], default="web",
-                    help="web=网页界面（默认，套用 DeepSeek 设计令牌）；tk=零依赖 tkinter 界面")
+    ap.add_argument("--ui", choices=["web", "tk", "native"], default="web",
+                    help="web=网页界面（默认，套用 DeepSeek 设计令牌）；"
+                         "tk=零依赖 tkinter 界面；native=pywebview 原生窗口（需 pip install pywebview）")
     ap.add_argument("--port", type=int, default=8770, help="网页界面的端口（被占用会自动往后找）")
     ap.add_argument("--no-open", action="store_true", help="不自动打开浏览器")
     ap.add_argument("--mood", choices=["local", "fly", "hybrid"], default="local",
@@ -58,6 +60,12 @@ def main() -> int:
         from liaoshu import ui
         ui.run(args.book, mood_mode=args.mood, mood_cache=args.mood_cache,
                fly_seconds=args.fly_seconds, speed=args.speed)
+        return 0
+
+    if args.ui == "native":
+        from liaoshu.desktop import run_native
+        run_native(args.book, port=args.port, mood_mode=args.mood, speed=args.speed,
+                   fly_seconds=args.fly_seconds, mood_cache=args.mood_cache)
         return 0
 
     if not os.path.isfile(args.book):
