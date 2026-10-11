@@ -58,6 +58,9 @@
           Helvetica, Arial, sans-serif);
   --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", Consolas,
           "Liberation Mono", Menlo, Courier, "PingFang SC", "Microsoft YaHei";
+
+  /* 正文字号：可在工具条上 A− / A+ 调，存在本地 */
+  --msg-size: 15px;
 }
 
 /* 跟随系统，除非用户手动指定了主题 */
@@ -186,6 +189,9 @@ button.ctl.primary {
   font-weight: 600;
 }
 button.ctl.on { border-color: var(--dsw-alias-brand-primary); }
+button.ctl.sq { padding: 6px 8px; font-size: 11.5px; font-weight: 600;
+                font-family: var(--font-mono); letter-spacing: .3px; }
+.field.fonts { gap: 4px; }
 button.ctl[disabled] { opacity: .4; cursor: default; }
 
 .field { display: inline-flex; align-items: center; gap: 6px;
@@ -240,18 +246,18 @@ input[type=range]::-moz-range-thumb {
   display: inline-block; max-width: 100%;
   background: var(--bubble-bg); border: 1px solid var(--bubble-border);
   border-radius: var(--dsw-radius-md);
-  padding: 9px 13px; line-height: 1.62; font-size: 14px;
+  padding: 9px 13px; line-height: 1.62; font-size: var(--msg-size);
   white-space: pre-wrap; word-break: break-word;
 }
 .row.narr { justify-content: center; margin: 14px 0; }
 .row.narr .bubble {
   background: none; border: 0; color: var(--dsw-alias-label-secondary);
-  font-size: 13px; text-align: center; padding: 2px 0; font-style: italic;
+  font-size: calc(var(--msg-size) - 1px); text-align: center; padding: 2px 0; font-style: italic;
 }
 .row.chap { justify-content: center; margin: 26px 0 18px; }
 .row.chap .chap-in {
   display: flex; align-items: center; gap: 12px; width: 100%;
-  color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 600;
+  color: var(--dsw-alias-label-primary); font-size: calc(var(--msg-size) - 1px); font-weight: 600;
 }
 .row.chap .chap-in::before, .row.chap .chap-in::after {
   content: ""; flex: 1; height: 1px; background: var(--dsw-alias-border-l2);

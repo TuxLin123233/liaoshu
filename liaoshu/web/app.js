@@ -461,6 +461,21 @@ function connect() {
 }
 
 /* ---------------------------------------------------------------- 控制 */
+const FONT_MIN = 12, FONT_MAX = 26, FONT_DEF = 15;
+
+function curFont() {
+  const v = parseFloat(getComputedStyle(document.documentElement)
+    .getPropertyValue('--msg-size'));
+  return isNaN(v) ? FONT_DEF : v;
+}
+
+function applyFont(px) {
+  px = Math.max(FONT_MIN, Math.min(FONT_MAX, Math.round(px)));
+  document.documentElement.style.setProperty('--msg-size', px + 'px');
+  try { localStorage.setItem('liaoshu.font', String(px)); } catch (e) {}
+  return px;
+}
+
 function bindControls() {
   $('rewind').innerHTML = svg('rewind') + ' 回退';
   $('skip').innerHTML = svg('skip') + ' 跳过';
@@ -492,6 +507,9 @@ function bindControls() {
   };
 
   $('mood').onchange = (e) => send('mood', { mode: e.target.value });
+
+  $('fontDown').onclick = () => applyFont(curFont() - 1);
+  $('fontUp').onclick = () => applyFont(curFont() + 1);
 
   $('sound').onclick = async () => {
     const on = await Sfx.toggle();
@@ -539,6 +557,8 @@ function bindControls() {
     const th = q !== null ? q : localStorage.getItem('liaoshu.theme');
     if (th !== null && th !== '') document.documentElement.dataset.theme = th;
     else if (th === '') document.documentElement.dataset.theme = '';
+    const fs = parseInt(localStorage.getItem('liaoshu.font'), 10);
+    if (fs) applyFont(fs);
     if (localStorage.getItem('liaoshu.sound') === '1') {
       // 浏览器要求先有用户手势才能出声，所以这里只做"点亮"，真正 resume 在第一次点击时
       $('sound').innerHTML = svg('sound');
