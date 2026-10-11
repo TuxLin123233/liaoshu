@@ -96,14 +96,19 @@ bad = {"老汉唱完", "他知", "加林开玩", "巧珍插嘴", "张地问她",
 check("名尾功能字不会被吃成名字", not (bad & set(sp)), f"残留 {bad & set(sp)}")
 
 # 长书实测：《人生》主力角色各归各位，动词尾假名不再进说话人栏
-rs = parse(open(os.path.join(ROOT, "samples", "人生.txt"), encoding="utf-8").read())
-rs_sp = [m.speaker for m in rs if m.kind == "dialogue" and m.speaker]
-top = [s for s, _n in __import__("collections").Counter(rs_sp).most_common(6)]
-check("《人生》主力角色占前六", {"加林", "巧珍", "亚萍"} <= set(top), f"前六 {top}")
-check("《人生》说话人以功能字收尾的假名清零",
-      not any(s[-1] in "手嘴轻想住告知惊玩叨断脸兄睛颤回硬摆母终怔般有舌先号父另溅解部一咽转怪吐"
-              for s in rs_sp),
-      f"残留 {sorted({s for s in rs_sp if s[-1] in '手嘴轻想住告知惊玩叨断脸兄睛颤回硬摆母终怔般有舌先号父另溅解部一咽转怪吐'})[:6]}")
+# （样本书有版权，不随仓库分发；本地没放这份本书就自动跳过）
+rs_path = os.path.join(ROOT, "samples", "人生.txt")
+if os.path.exists(rs_path):
+    rs = parse(open(rs_path, encoding="utf-8").read())
+    rs_sp = [m.speaker for m in rs if m.kind == "dialogue" and m.speaker]
+    top = [s for s, _n in __import__("collections").Counter(rs_sp).most_common(6)]
+    check("《人生》主力角色占前六", {"加林", "巧珍", "亚萍"} <= set(top), f"前六 {top}")
+    check("《人生》说话人以功能字收尾的假名清零",
+          not any(s[-1] in "手嘴轻想住告知惊玩叨断脸兄睛颤回硬摆母终怔般有舌先号父另溅解部一咽转怪吐"
+                  for s in rs_sp),
+          f"残留 {sorted({s for s in rs_sp if s[-1] in '手嘴轻想住告知惊玩叨断脸兄睛颤回硬摆母终怔般有舌先号父另溅解部一咽转怪吐'})[:6]}")
+else:
+    check("《人生》长书回归（样本书未入库，本地存在时启用）", True, "跳过")
 
 # --------------------------------------------------------------------------
 print("\n[2] 时序：确定性")
