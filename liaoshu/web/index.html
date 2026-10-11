@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>聊书 · liaoshu</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><b>聊书</b><span>liaoshu</span></div>
+
+    <div class="side-sec">
+      <div class="side-head">目录</div>
+      <div class="side-list" id="chapters"></div>
+    </div>
+
+    <div class="side-sec grow">
+      <div class="side-head">角色</div>
+      <div class="side-list" id="cast"></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="title" id="book">未载入</div>
+
+      <button class="ctl primary" id="play"></button>
+      <button class="ctl" id="rewind" title="回退（←）"></button>
+      <button class="ctl" id="skip" title="跳过当前条（→）"></button>
+      <button class="ctl" id="restart" title="重来（R）"></button>
+
+      <span class="field">速度
+        <input type="range" id="speed" min="0.1" max="6" step="0.05" value="1"
+               style="width:110px">
+        <span class="val" id="speedVal">1×</span>
+      </span>
+
+      <span class="field">
+        <button class="ctl on" id="narr" title="显示/隐藏旁白">旁白</button>
+      </span>
+
+      <span class="field">节奏源
+        <select id="mood">
+          <option value="local">本地 OU</option>
+          <option value="fly">果蝇连接组</option>
+          <option value="hybrid">果蝇 × 本地</option>
+        </select>
+      </span>
+
+      <button class="ctl" id="sound" title="音效开关"></button>
+      <button class="ctl" id="theme" title="明暗切换"></button>
+    </header>
+
+    <div class="stream" id="stream">
+      <div class="stream-inner" id="streamInner">
+        <div class="empty"><p>正在连接…</p></div>
+      </div>
+    </div>
+
+    <footer class="bottombar">
+      <div class="status" id="status">—</div>
+      <input type="range" class="progress" id="progress" min="0" max="1" step="1" value="0">
+    </footer>
+  </main>
+
+</div>
+<!--BOOT-->
+<script src="/app.js"></script>
+</body>
+</html>
