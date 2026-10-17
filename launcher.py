@@ -141,7 +141,7 @@ def main() -> int:
     ap.add_argument("--speed", type=float, default=1.0)
     ap.add_argument("--rules", default=None,
                     help="用户过滤规则文件（默认自动读 ~/.config/liaoshu/rules.json，"
-                         "Windows 为 %LOCALAPPDATA%\\liaoshu\\rules.json）")
+                         "Windows 为 %%LOCALAPPDATA%%\\liaoshu\\rules.json）")
     ap.add_argument("--rules-init", action="store_true",
                     help="生成一份示例规则文件并退出（想自己动过滤时用它）")
     args = ap.parse_args()

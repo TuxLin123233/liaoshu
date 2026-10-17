@@ -333,3 +333,19 @@ input[type=range]::-moz-range-thumb {
   .sidebar { display: none; }
   .progress { flex: 1 1 auto; }
 }
+
+/* ---------------------------------------------------------------- 小窗模式
+ * 只留打字流：侧栏/进度条收起，顶栏压扁，正文铺满。由顶栏小窗按钮打开。
+ */
+.app.mini { grid-template-columns: 1fr; }
+.app.mini .sidebar { display: none; }
+.app.mini .bottombar { display: none; }
+.app.mini .topbar { padding: 7px 10px; gap: 6px; }
+.app.mini .title { font-size: 12.5px; }
+.app.mini .jump-wrap,
+.app.mini .field,
+.app.mini #rewind,
+.app.mini #skip,
+.app.mini #restart { display: none; }
+.app.mini .stream-inner { max-width: none; padding: 14px 14px 32px; }
+.app.mini #mini { margin-left: auto; }

@@ -123,6 +123,9 @@ const S = {
   bookId: null, _restored: false, _savedAt: 0,
 };
 
+/* 小窗模式：只显示打字流。开着时视口永远贴底，绝不跟丢正在打的那句。 */
+let MINI = false;
+
 const MAX_ROWS = 260;
 const PAGE = 200;
 
@@ -146,6 +149,8 @@ const ICONS = {
   gear: '<circle cx="8" cy="8" r="2.3"/>'
       + '<path d="M8 1.7v1.5M8 12.8v1.5M1.7 8h1.5M12.8 8h1.5'
       + 'M3.5 3.5l1.1 1.1M11.4 11.4l1.1 1.1M12.5 3.5l-1.1 1.1M4.6 11.4l-1.1 1.1"/>',
+  mini: '<rect x="2.4" y="3" width="11.2" height="10" rx="1.8"/>'
+      + '<path d="M2.4 5.7h11.2"/>',
 };
 
 function svg(name, size) {
@@ -276,10 +281,35 @@ function nearBottom() {
   return s.scrollHeight - s.scrollTop - s.clientHeight < 90;
 }
 function maybeScroll(force) {
-  if (force || S.auto) {
-    S.stream.scrollTop = S.stream.scrollHeight;
-    S.auto = true;
+  if (!force && !S.auto && !MINI) return;
+  S.auto = true;
+  // 等这一帧的布局落定再滚，否则新加的一行还没量高度，会差一截
+  requestAnimationFrame(() => { S.stream.scrollTop = S.stream.scrollHeight; });
+}
+
+/* ---------------------------------------------------------------- 小窗模式
+ * 独立的一个小窗口，只留打字流：侧栏、进度条收起，视口永远贴着正在打的那句。
+ * 点顶栏的小窗按钮开一个弹窗；弹窗被拦（或已在浏览器标签里）时就地折叠。
+ */
+function applyMini(on) {
+  MINI = on;
+  const app = document.querySelector('.app');
+  if (app) app.classList.toggle('mini', on);
+  const b = $('mini');
+  if (b) b.title = on ? '退出小窗' : '小窗模式（只显示打字）';
+  if (b) b.classList.toggle('on', on);
+  maybeScroll(true);
+}
+
+function openMini() {
+  if (MINI) {
+    window.close();                          // 自己开的窗口能关；关不掉就退化成还原
+    setTimeout(() => applyMini(false), 60);
+    return;
   }
+  const w = window.open(location.pathname + '?mini=1', 'liaoshu-mini',
+                        'popup=yes,width=380,height=620');
+  if (!w) applyMini(true);                   // 弹窗被拦截 → 就地折叠
 }
 
 /* ---------------------------------------------------------------- 正在输入 */
@@ -548,7 +578,10 @@ function bindControls() {
   $('theme').innerHTML = svg('theme');
   $('sound').innerHTML = svg('mute');
   $('settings').innerHTML = svg('gear');
+  $('mini').innerHTML = svg('mini');
   setPlayBtn(false);
+
+  $('mini').onclick = (e) => { e.stopPropagation(); openMini(); };
 
   $('settings').onclick = (e) => {
     e.stopPropagation();
@@ -628,6 +661,9 @@ function bindControls() {
   S.stream = $('stream');
   S.inner.innerHTML = '';
   bindControls();
+
+  // ?mini=1 → 独立小窗：只显示打字流（由顶栏小窗按钮 popup 打开）
+  if (new URLSearchParams(location.search).get('mini') === '1') applyMini(true);
 
   try {
     // ?theme=dark|light 可以直接指定主题（也方便截图和分享链接）
